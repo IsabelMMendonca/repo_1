@@ -1,0 +1,3 @@
+[submodule "ndf-insight-brasil"]
+	path = ndf-insight-brasil
+	url = https://github.com/quartixio/ndf-insight-brasil
