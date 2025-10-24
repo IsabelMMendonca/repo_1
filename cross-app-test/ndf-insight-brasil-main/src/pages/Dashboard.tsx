@@ -7,18 +7,27 @@ import { useNDFData } from "../contexts/NDFDataContext";
 import { Button } from "../components/ui/button";
 import Overview from "./Overview";
 
+//pinia
+import { useToggleFilter} from '../../../../cross-app-test/src/store/index.js'
+
 export default function Dashboard() {
   const [showFilters, setShowFilters] = useState(true);
   const { data, setData } = useNDFData();
   const [wizardOpen, setWizardOpen] = useState(false);
-
+  function handleClick() {
+    
+    setShowFilters(!showFilters)
+    const piniaStore = (window as any).toggleStore
+    piniaStore?.set(!showFilters)
+    console.log(piniaStore.showFilters)
+ 
+  }
   return (
     <div className="flex min-h-screen w-full bg-background">
       {/* Header */}
       <div className="fixed top-0 left-0 right-0 h-14 bg-card border-b z-50 flex items-center justify-between px-4">
         <div className="flex items-center gap-4">
-          <h5 className="text-yellow-300">css test inside <span className="underline">react</span></h5>
-          <h1 className="font-bold">NDF e-Sales Dashboard</h1>
+          <h2 className="font-bold">NDF e-Sales Dashboard</h2>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setWizardOpen(true)}>
@@ -26,7 +35,7 @@ export default function Dashboard() {
             {data.length > 0 ? "Recarregar CSV" : "Carregar CSV"}
           </Button>
           <Link to="/analytics">
-            <Button variant="outline" size="sm">
+            <Button variant="default" size="sm">
               <BarChart3 className="w-4 h-4 mr-2" />
               Analytics
             </Button>
@@ -36,8 +45,8 @@ export default function Dashboard() {
 
       {/* Toggle Button */}
       <button
-        onClick={() => setShowFilters(!showFilters)}
-        className="fixed top-16 left-4 z-50 p-2 bg-card border rounded-lg shadow-lg hover:bg-accent transition-colors"
+        onClick={handleClick}
+        className="fixed top-13 left-4 z-50 p-2 bg-card border rounded-lg shadow-lg hover:bg-accent transition-colors"
         aria-label="Toggle filters"
       >
         {showFilters ? (
