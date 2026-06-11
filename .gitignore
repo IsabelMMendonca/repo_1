@@ -1,4 +1,4 @@
-node_modules
-gitmodules
-cross-app-test
+**/node_modules/
+.gitmodules
+**/cross-app-test/
 .DS_Store
