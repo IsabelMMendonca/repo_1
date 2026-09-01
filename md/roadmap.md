@@ -1,2129 +1,1083 @@
-I understand — you want the **complete reference document**, not a summary. Let me generate it in full, section by section. Since it's very long, I'll give you the first part now, and you say "continue" for the next part. We'll build the complete `.md` file together.
-
----
-
-# Roadmap to Senior Software Engineering
-
-## A Complete Reference Guide
-
-**Status:** Living document — read, re-read, and return to as you grow.
-
-**How to use this:** You don't read this cover to cover. You read the section that matches the problem in front of you. Over time, the sections connect, and the big picture forms.
-
----
+# ROADMAP TO SENIOR SOFTWARE ENGINEERING
 
 # PART 1: ARCHITECTURE
 
-Architecture is the set of **decisions that are expensive to change later**. Code is easy to change. Database choice is hard. Service boundaries are hard. Communication patterns are hard. A senior engineer learns to **spend their thinking on the hard-to-change decisions** and stop agonizing over the easy ones.
+## 1.1 What Architecture Really Is
 
-## 1.1 Architectural Styles
+Architecture is the set of decisions that are expensive to reverse.
 
-### 1.1.1 Monolith
+That's the definition that matters. Everything else follows from it.
 
-**What it is:** One application. One codebase. One deployment unit. All features live in the same process.
+Think about it this way. When you're writing code, you make hundreds of decisions every day. What to name a variable. How to structure a loop. Whether to use a dictionary or a list. These decisions are cheap to reverse. If you name a variable badly, you rename it in thirty seconds. If you structure a loop poorly, you rewrite it in five minutes. No one cares. No one should care.
 
-**When to use it:**
-- Small team (1–5 developers)
-- Early product, still proving value
-- Low-to-moderate traffic
-- Simple or well-understood domain
+But some decisions are different. Which database to use. How services communicate. Where the boundaries between modules are. How data flows through the system. These decisions are expensive to reverse. If you choose the wrong database, migrating to another one can take months. If you draw the service boundaries in the wrong place, restructuring the system can take a year. If you make the wrong call about how services talk to each other, changing that protocol ripples through every component.
 
-**Advantages:**
-- Simple to develop — no network between modules
-- Simple to deploy — one artifact
-- Simple to debug — one process, one log
-- Transactions are easy — everything in one database
+Those are architectural decisions.
 
-**Disadvantages:**
-- Hard to scale selectively — you scale the whole thing or nothing
-- One bug can take down the entire system
-- Long-term coupling — code becomes tangled
-- Technology lock-in — hard to introduce a new language or framework
+The senior engineer's job is to recognize which decisions are architectural and which are not. To spend their thinking on the decisions that are expensive to reverse, and to stop agonizing over the decisions that are cheap to change.
 
-**Your legacy `rfq_api.py` was a monolith.** It handled HTTP, business logic, institution protocols, database access, pricing, everything in one file. It worked, but every change to one part risked breaking another part.
+A junior engineer will spend an hour debating variable names and then casually choose a database without thinking. A senior engineer does the opposite. They don't care what the variable is called, because that's a thirty-second fix. But they will think deeply before committing to a database, because that decision will shape everything that follows.
+
+This is not about intelligence. It's about focus. It's about knowing where to point your attention.
+
+When you're about to make a decision, ask yourself: "How hard is this to change later?" If the answer is "trivial," then make the decision quickly and move on. If the answer is "very hard," then slow down. Think. Discuss with your team. Consider the alternatives. Document what you decided and why.
+
+The more expensive a decision is to reverse, the more architectural it is. And the more architectural it is, the more it deserves your careful attention.
+
+Your own work is a perfect example. You migrated from a legacy monolith to a new architecture with separate components. That migration involved architectural decisions. Splitting the API from the daemon. Deciding that institutions would be libraries. Choosing Redis as the message bus. Implementing locking and idempotency. These were all decisions that would be expensive to reverse once implemented. And because they were architectural, they deserved the careful thinking you gave them.
+
+Where you went wrong was not in the thinking. It was in the communication. You made architectural decisions without involving the team. That's a different lesson, and we'll get to it. But the underlying architectural decisions you made were fundamentally sound. The problem was that architecture is not just about technical correctness. It's also about alignment. A technically correct architecture that the team doesn't understand or agree with is a failed architecture.
 
 ---
 
-### 1.1.2 Microservices
+## 1.2 The Architectural Styles
 
-**What it is:** Many small, independently deployable services. Each owns one business capability. They communicate over the network.
+There are several ways to structure a software system. Each has its place. The senior engineer knows them all, understands their trade-offs, and chooses based on the specific situation rather than personal preference.
 
-**When to use it:**
-- Large team (20+ developers)
-- Multiple independent features
-- High traffic with uneven load
-- Need to deploy parts independently
-- Different teams own different services
+### The Monolith
 
-**Advantages:**
-- Independent scaling — scale only what's under load
-- Independent deployment — ship one service without touching others
-- Fault isolation — one service down doesn't take everything down
-- Technology freedom — each service can use the right tool
+A monolith is one application that does everything. One codebase. One deployment. One process. One database.
 
-**Disadvantages:**
-- Distributed systems are hard — network failures are normal, not exceptional
-- Data consistency is harder — no simple database transactions across services
-- Debugging is harder — a request spans multiple services and logs
-- Operational complexity — more deployments, more monitoring, more failure modes
+Your legacy `rfq_api.py` was a monolith. One file contained HTTP handlers, business logic, institution integration, database access, pricing logic, document management, and manual price queue handling. Everything in one place.
 
-**Your new architecture (`rfq_api2` + `rfqd` + institution libraries) is a step toward this, but it's not full microservices. It's one deployment with internal boundaries.**
+The monolith is not inherently bad. In fact, for most of the history of software, most systems were monoliths. Many successful companies still run monoliths today. Shopify runs a massive monolith. Stack Overflow runs a monolith. A monolith can handle enormous scale if it's well-structured internally.
 
----
+The advantage of a monolith is simplicity. When everything is in one process, there is no network between your components. Function calls are fast and reliable. Transactions are straightforward. Debugging is simpler because there's one log to look at. Deployment is simpler because there's one artifact to deploy.
 
-### 1.1.3 Modular Monolith
+The disadvantage of a monolith is that it tends to become tangled over time. Without disciplined boundaries, code that should be separate gets mixed together. The HTTP layer starts calling the database directly. The business logic starts knowing about institution-specific details. One change ripples through the entire codebase. Testing becomes all-or-nothing. The monolith becomes a "big ball of mud" — everything connected to everything else.
 
-**What it is:** One deployment unit, but with **clean internal boundaries**. Separate modules, separate responsibilities, but running in the same process.
+That's what happened to your legacy `rfq_api.py`. It wasn't just large. It was tangled. The HTTP layer knew about OctaX. The business logic knew about bank IDs. Adding a new bank meant adding conditionals throughout the file. That's the failure mode of a monolith: not its size, but its lack of internal boundaries.
 
-**When to use it:**
-- Medium team
-- You want separation but not the operational cost of microservices
-- You may split into microservices later, but don't need to yet
+The monolith is appropriate when the team is small, the product is new, and the traffic is moderate. It's the right starting point for most projects. The mistake is not starting with a monolith. The mistake is letting it grow without boundaries until it becomes unmaintainable.
 
-**Advantages:**
-- Simpler than microservices — no network between modules
-- Cleaner than a monolith — modules have boundaries
-- Easy to refactor into services later if needed
-- Transactions and consistency remain simple
+### The Microservices Architecture
 
-**Disadvantages:**
-- Still one deployment — can't scale parts independently
-- Boundaries can erode if not enforced with tests
-- One process can still be a single point of failure
+At the other extreme is microservices. Instead of one application doing everything, you have many small applications, each doing one thing. Each service has its own codebase, its own database, its own deployment pipeline. Services communicate over the network.
 
-**This is what your boss wanted.** The `rfq_api2` + `rfqd` + institution libraries pattern is a modular monolith. Separate files, separate responsibilities, but deployed together.
+A microservices architecture for an RFQ system might look like this: one service for the HTTP API, another service for the workflow engine, another for each bank integration, another for documents, another for notifications. Each service is independently deployable. Each can scale independently.
 
----
+The advantage of microservices is independence. Teams can work on different services without stepping on each other. Services can be deployed independently, so you can ship a change to one service without redeploying everything. Services can scale independently, so you can give more resources to the quote engine without also scaling the document service. Failures are isolated, so a bug in one service doesn't necessarily take down the whole system.
 
-### 1.1.4 Event-Driven Architecture
+The disadvantage of microservices is complexity. Distributed systems are hard. Network failures are normal, not exceptional. Data consistency across services is a genuinely difficult problem. Debugging a request that spans five services is much harder than debugging a request in a single process. And the operational overhead — monitoring, tracing, logging, deployment pipelines — is substantial.
 
-**What it is:** Components communicate by **publishing events** that other components subscribe to, rather than calling each other directly.
+Microservices are appropriate when the team is large, the product is mature, and the traffic is high. They're not a goal to pursue for their own sake. They're a solution to specific problems: too many people stepping on each other, parts of the system needing to scale differently, the need for independent deployment.
 
-**Example — Request/Response (direct call):**
+Most teams should not start with microservices. They should start with a monolith, let it grow, and split it when the pain becomes real. That's what your boss was pushing toward — not full microservices, but a modular monolith with clean boundaries.
 
-```text
-Service A → calls Service B → waits for response
-```
+### The Modular Monolith
 
-**Example — Event-Driven (publish/subscribe):**
+The modular monolith is the middle path. It's one deployment unit, but with clean internal boundaries. Separate modules, separate responsibilities, but running in the same process.
 
-```text
-Service A → publishes "OrderCreated" event
-Service B → subscribed to "OrderCreated" → reacts
-Service C → subscribed to "OrderCreated" → reacts
-```
+Your new architecture — `rfq_api2` plus `rfqd` plus institution libraries — is a modular monolith. The API and the daemon are separate components with separate responsibilities, but they're deployed together as one unit. The libraries are separate modules, each owning one bank's protocol, but they're imported by the daemon rather than running as separate services.
 
-A and B and C don't know about each other. They only know about the event.
+The advantage of the modular monolith is that you get many of the benefits of separation without paying the full cost of distribution. Boundaries are clean, so changes to one module don't ripple through the whole system. Testing is modular, so you can test each piece in isolation. But there's no network between modules, so you don't have the complexity of distributed systems.
 
-**When to use it:**
-- Decoupled workflows — many things need to react to the same event
-- Fire-and-forget operations — no immediate response needed
-- Audit trails — events form a natural log of what happened
-- Asynchronous processing — things that can happen "eventually"
+The disadvantage is that you can't scale parts independently. If the quote engine needs ten times the resources of the document service, you can't give it more machines without also scaling everything else. You also still have one deployment, so every change requires redeploying the whole thing.
 
-**Advantages:**
-- Loose coupling — publishers don't know subscribers
-- Scalability — events can fan out to many consumers
-- Resilience — if one consumer is down, others continue
-- Auditability — events form a history
+The modular monolith is often the right answer for medium-sized teams with medium complexity. It gives you clean boundaries without the operational burden of microservices. And critically, it's the easiest architecture to split into microservices later if you need to. Because the boundaries are already clean, extracting a module into a separate service is a mechanical process rather than a rewrite.
 
-**Disadvantages:**
-- Harder to reason about — no direct call stack to follow
-- Eventual consistency — data may be stale temporarily
-- Debugging is harder — you trace events, not call stacks
-- Ordering and duplication are hard — events may arrive out of order or twice
-
-**Your quote streaming target** (Redis Pub/Sub or Streams for price updates) is an event-driven design. Instead of the API polling the daemon every second, the daemon publishes a price change event, and the API receives it when it happens.
+This is what your boss was pushing toward. He didn't want full microservices. He wanted clean boundaries. Separate files for separate concerns. The API doesn't know about banks. The daemon doesn't know about bank protocols. Each bank is a library. That's a modular monolith, and it's a perfectly reasonable architecture for your situation.
 
 ---
 
-### 1.1.5 Hexagonal Architecture (Ports and Adapters)
+## 1.3 System Decomposition
 
-**What it is:** A way to structure code so that **business logic is isolated from external systems** like databases, HTTP, and message queues.
+The hardest question in architecture is not "what technology should we use?" It's "where do we draw the lines between components?"
 
-**The core idea:**
+Decomposition is the act of taking a large system and dividing it into smaller pieces. The goal is to create pieces that can change independently. If two things change for the same reason, they belong together. If they change for different reasons, they belong apart.
 
-```text
-        ┌──────────────────────────┐
-        │      DOMAIN / CORE       │  ← business rules, pure logic
-        │   (no external deps)     │
-        └──────────┬───────────────┘
-                   │
-          ports (interfaces)
-                   │
-        ┌──────────┴───────────────┐
-        │        ADAPTERS          │  ← HTTP, database, Redis, banks
-        │  (external systems)      │
-        └─────────────────────────┘
-```
+This is the single most important principle in system decomposition, and it's worth repeating: things that change together belong together. Things that change for different reasons belong apart.
 
-**The domain (core) knows nothing about HTTP, databases, or banks.** It defines **ports** (interfaces) like "I need to save an RFQ" or "I need a quote." Adapters implement those ports for real systems.
+Think about your system. The HTTP layer changes when the frontend contract changes. The workflow engine changes when the business rules change. The bank libraries change when a bank's API changes. These are different reasons for change. Therefore, they should be in different modules.
 
-**When to use it:**
-- Complex business rules you want to test in isolation
-- Systems that integrate with many external services
-- Long-lived applications where external systems change often
+If you put the HTTP layer and the bank library in the same file, then a change to the bank's API forces you to touch the HTTP layer. That's what happened in your legacy code. A change to OctaX forced changes to the same file that handled HTTP routes. The boundaries were wrong because things that changed for different reasons were in the same place.
 
-**Advantages:**
-- Business logic testable without external dependencies
-- External systems can be swapped without touching core logic
-- Clear separation between "what we do" (core) and "how we do it" (adapters)
+The way to find good boundaries is to ask: "If I change this, what else do I have to change?" If the answer is "nothing else," you've found a good boundary. If the answer is "three other files," your boundary is probably wrong.
 
-**Disadvantages:**
-- More files and indirection
-- Can feel like over-engineering for simple apps
-- Requires discipline to maintain boundaries
+Another way to think about it is the "single responsibility" principle applied at the system level. A module should have one reason to change. Not ten reasons. One. If a module has many reasons to change, it's doing too much. Split it.
 
-**Your `rfqd` + adapter + library pattern is a form of this.** `rfqd` is the core (workflow, state). Libraries are adapters (how to talk to each bank). The adapter boundary ensures `rfqd` doesn't know bank details.
+This is the essence of what your boss was trying to tell you. He said the legacy API shouldn't be contaminated with bank-specific code. He was saying: the HTTP layer should only change when the frontend contract changes. It should not change when a bank changes. Those are different reasons for change, and they belong in different modules.
 
 ---
 
-### 1.1.6 Layered Architecture
+## 1.4 Domain-Driven Design
 
-**What it is:** The classic "N-tier" structure. Each layer talks only to the layer below.
+Domain-Driven Design (DDD) is a set of ideas about how to model complex business domains in software. It was introduced by Eric Evans in his 2003 book of the same name, and it has profoundly influenced how senior engineers think about architecture.
 
-```text
-Presentation (HTTP, UI)
-     ↓
-Application (use cases, orchestration)
-     ↓
-Domain (business rules)
-     ↓
-Infrastructure (database, external services)
-```
+The central insight of DDD is that the most important part of a software system is not the technology — it's the business domain. The software should model the business, not the other way around. And the way to model the business is to work closely with domain experts to develop a shared language.
 
-**When to use it:**
-- Simple applications
-- Teams new to architecture
-- When you want predictability over flexibility
+That shared language is called the "ubiquitous language." It's a vocabulary that both engineers and business people agree on and use consistently. When an engineer says "RFQ," they mean the same thing as when a trader says "RFQ." When someone says "quote," everyone knows exactly what that means. The ubiquitous language removes ambiguity and ensures that the software models the business accurately.
 
-**Advantages:**
-- Easy to understand
-- Clear separation of concerns
-- New developers get oriented quickly
+In your system, the ubiquitous language includes terms like RFQ, quote, execute, cancel, deal, bank, broker, client, and spread. These terms have specific meanings in your business, and the software should use them consistently.
 
-**Disadvantages:**
-- Can become rigid — every change crosses every layer
-- Layers can become too coupled if not enforced
-- Doesn't handle complex domain logic as well as hexagonal or DDD
+DDD introduces several key concepts that help structure complex domains.
 
----
+An "entity" is something with an identity that persists over time. An RFQ is an entity. It has an `rfq_id` that identifies it uniquely. Even if all its other attributes change, it's still the same RFQ. A bank is an entity. A client is an entity. Entities are defined by their identity, not by their attributes.
 
-## 1.2 Service Boundaries
+A "value object" is something defined by its values rather than its identity. A price is a value object. If the price changes from 5.10 to 5.11, it's not the same price anymore. There's no such thing as a price with an identity that persists while its value changes. Currency pairs are value objects. Spreads are value objects. Value objects are immutable — once created, they don't change. If you need a different price, you create a new price.
 
-The hardest question in architecture: **Where do you draw the line between one service and another?**
+An "aggregate" is a cluster of entities and value objects that are treated as a single unit for the purpose of data changes. An RFQ and its quotes form an aggregate. You don't change a quote independently of the RFQ it belongs to. You load the RFQ, make changes to the whole aggregate, and save the whole aggregate. The aggregate ensures consistency within its boundary.
 
-### The Wrong Way: By Technology
+A "repository" is the interface for loading and saving aggregates. Your orderlog is a repository. It loads RFQs by `rfq_id` and saves them back. The rest of the system doesn't need to know how the orderlog works internally — it just knows how to load and save RFQs.
 
-```text
-❌ Service 1: All database code
-❌ Service 2: All HTTP endpoints
-❌ Service 3: All background jobs
-```
+A "domain event" is something that happened in the business that other parts of the system might care about. "RFQ dealt" is a domain event. "RFQ cancelled" is a domain event. These events are published when state changes, and other components can subscribe to them and react.
 
-This creates services that don't map to business capabilities. Any feature touches all services.
+A "bounded context" is a boundary within which a term has a specific, consistent meaning. The word "quote" might mean different things in different parts of the system. In the trading context, a quote is a bank's price for a currency pair. In the document context, a quote might mean something else entirely. Bounded contexts allow the same word to have different meanings in different parts of the system without confusion.
 
-### The Right Way: By Business Capability
+The most important thing to understand about DDD is that it's not a set of rules to follow mechanically. It's a way of thinking. It's about putting the business domain at the center of your architecture, developing a shared language with domain experts, and structuring your code around business concepts rather than technical ones.
 
-```text
-✅ Service 1: RFQ workflow (create, quote, execute, cancel)
-✅ Service 2: Institution integration (each bank's protocol)
-✅ Service 3: Manual price queue
-```
-
-Each service owns a business capability end to end — its logic, its data, its external calls.
-
-### How to Find Good Boundaries
-
-Ask: **"Does this change for the same reason?"**
-
-- If two things change together, they belong together
-- If two things change for different reasons, they belong apart
-
-Your `rfq_api2` changes when the frontend contract changes. Your `rfqd` changes when the workflow changes. Your institution libraries change when a bank's API changes. These are different reasons, so they're separate boundaries.
+You don't need to adopt DDD fully to benefit from its ideas. The vocabulary alone — entity, value object, aggregate, repository, domain event, bounded context — gives you a way to think and communicate about your architecture that is precise and shared.
 
 ---
 
-### Domain-Driven Design (DDD) — The Short Version
+## 1.5 Clean Architecture
 
-DDD is a set of patterns for modeling complex business domains.
+Clean Architecture, popularized by Robert Martin, is the idea that dependencies in a system should point inward, toward the core business logic.
 
-**Key concepts:**
+Imagine concentric circles. The innermost circle is the domain — the business rules. The next circle is the application layer — the use cases and orchestration. The next circle is the infrastructure — databases, HTTP, external services. The outermost circle is the details — frameworks, tools, UI.
 
-| Concept | What It Means |
-|---|---|
-| **Entity** | Something with an identity (an RFQ, a bank, a client) |
-| **Value Object** | Something defined by its values, no identity (a price, a currency pair) |
-| **Aggregate** | A cluster of entities treated as one unit (an RFQ and its quotes) |
-| **Repository** | The interface for loading/saving aggregates (orderlog access) |
-| **Domain Event** | Something that happened (RFQ dealt, RFQ cancelled) |
-| **Bounded Context** | A boundary where a term has a specific meaning |
+The rule is simple: inner circles know nothing about outer circles. Outer circles depend on inner circles.
 
-**You don't need full DDD.** But the vocabulary helps you think clearly about boundaries.
+The domain layer does not know about HTTP. It does not know about databases. It does not know about Redis or Docker or FastAPI. It knows only about the business: what an RFQ is, what states it can be in, what transitions are allowed.
 
-**Example from your system:**
+The application layer orchestrates the domain. It knows how to create an RFQ, how to request a quote, how to execute a trade. It depends on the domain layer, but it does not know about HTTP or databases.
 
-- `RFQ` is an **entity** — it has an `rfq_id`
-- `Quote` is a **value object** — defined by price, side, spread
-- `rfq.dealt` is a **domain event** — something happened
-- `orderlog` is a **repository** — it loads and saves RFQs
+The infrastructure layer provides the implementations of the interfaces that the inner layers define. The domain layer defines "I need to save an RFQ." The infrastructure layer provides "here's how to save it to Redis." The domain layer defines "I need a quote from this bank." The infrastructure layer provides "here's how to call the bank's API."
+
+The benefit of this structure is that the core business logic is testable and changeable without touching external systems. You can test the workflow engine without a database. You can change the database without touching the business logic. You can swap external services without rewriting the core.
+
+Your system already follows this principle in important ways. `rfqd` is the core — it knows about RFQ states, workflow, persistence. The institution libraries are infrastructure — they know how to talk to specific banks. The API is infrastructure — it knows how to talk HTTP. `rfqd` depends on the libraries, not the other way around. The libraries don't know about `rfqd`. That's clean architecture.
+
+Where your system gets messier is in the details. The legacy `rfq_api.py` violated clean architecture entirely. It was all circles mixed into one file. The HTTP handlers knew about bank protocols. The business logic knew about HTTP status codes. Everything depended on everything.
+
+Your new architecture is cleaner. But it's not perfectly clean. And that's okay. Clean Architecture is a direction, not a destination. The goal is to keep pushing dependencies inward, to keep the core business logic independent of the details. You'll never get there perfectly. But every step in that direction makes the system easier to understand, test, and change.
 
 ---
 
-## 1.3 Design Patterns
+## 1.6 The Real Trade-Off: Monolith vs Microservices
 
-Design patterns are **reusable solutions to common problems**. They're not rules — they're tools.
+The debate between monoliths and microservices is one of the most common in software engineering. And most of it misses the point.
 
-### Creational Patterns
+The point is not "which is better?" The point is "what problem are you trying to solve?"
 
-| Pattern | What It Solves | Your Example |
-|---|---|---|
-| **Factory** | Creating objects without specifying exact class | `adapter_for()` creates the right adapter |
-| **Singleton** | One instance of a class | `_dedup_store` in your dedup module |
-| **Builder** | Constructing complex objects step by step | `rfq_register_orderlog()` building an RFQ |
+A monolith is not a failure. A microservice architecture is not an achievement. They are both tools, and each solves different problems.
 
-### Structural Patterns
+A monolith solves the problem of complexity. When everything is in one process, there's less to think about. No network failures between your components. No distributed transactions. No service discovery. One log file. One deployment. One thing to understand.
 
-| Pattern | What It Solves | Your Example |
-|---|---|---|
-| **Adapter** | Making two incompatible interfaces work together | `BrazaAdapter` wrapping `libbraza` |
-| **Facade** | Simple interface over a complex subsystem | `rfq_api2` as facade over `rfqd` |
-| **Proxy** | Controlling access to an object | Redis dedup store as proxy to Redis |
+A microservice architecture solves the problem of scale — both technical and organizational. When you have fifty engineers, one codebase becomes a bottleneck. Everyone steps on everyone else. When you have a million users, one process becomes a bottleneck. You need to scale parts independently. When you need to ship changes to one part of the system without redeploying everything, microservices give you that.
 
-### Behavioral Patterns
+But microservices don't solve complexity. They move it. Instead of complex code, you have complex infrastructure. Instead of complex interactions within a process, you have complex interactions over a network. The complexity doesn't disappear. It changes form.
 
-| Pattern | What It Solves | Your Example |
-|---|---|---|
-| **Strategy** | Swappable algorithms | Different adapters for different banks |
-| **Observer** | Notifying many objects when state changes | SSE quote events to frontend |
-| **State Machine** | Managing transitions between states | QUOTE → DEAL / CANCELLED / REJECTED |
-| **Command** | Encapsulating a request as an object | Your `command_new`, `command_quote`, etc. |
+This is why so many teams that adopt microservices end up regretting it. They had a monolith that was working, but they heard that microservices were "the right way," so they split everything into services. Then they discovered that distributed systems are hard. Network failures happen. Data gets inconsistent. Debugging becomes a nightmare. And the team is now spending all its time managing infrastructure instead of building features.
+
+The senior engineer's approach is different. They don't ask "is this a monolith or microservices?" They ask "what's the problem, and what's the simplest structure that solves it?"
+
+Usually, the answer is a modular monolith. Clean boundaries within one deployment. That's what your boss was pushing for, whether he used the term or not. He wanted separation of concerns without the complexity of full distribution.
+
+The lesson: don't adopt microservices because they're fashionable. Adopt them when the pain of a monolith is real and specific. And even then, consider the modular monolith first. It's often enough.
 
 ---
 
-## 1.4 Clean Architecture
+## 1.7 Distributed Systems — The Hard Truth
 
-Clean Architecture is **the idea that dependencies point inward**.
+Once you have more than one process communicating over a network, you have a distributed system. And distributed systems are fundamentally harder than single-process systems.
 
-```text
-Outer layers (details) → Inner layers (core)
-```
+The reason is simple: the network is unreliable. Not sometimes unreliable. Always unreliable. It's just a matter of degree.
 
-**The rule:** Inner layers know nothing about outer layers. Outer layers depend on inner layers.
+The "fallacies of distributed computing" are a famous list of assumptions that everyone makes and that are all wrong. The network is not reliable. Latency is not zero. Bandwidth is not infinite. The network is not secure. The topology doesn't stay the same. There is more than one administrator. Transport costs are not zero. The network is not homogeneous. All false. All assumed.
 
-```text
-HTTP (outer) → knows about → Workflow (inner)
-Workflow (inner) → does NOT know about → HTTP (outer)
-```
+What this means in practice is that you cannot treat a network call like a function call. A function call either succeeds or throws an exception. A network call can succeed, fail, hang, return garbage, or — most confusingly — succeed but you never find out because the response got lost.
 
-**In your system:**
+This is the fundamental problem that your `rfqd` with its UNKNOWN state is trying to solve. When `rfqd` sends an execute command to a bank, one of several things can happen:
 
-```text
-rfq_api2 (outer) → knows about → Redis queue → rfqd (inner)
-rfqd (inner) → does NOT know about → HTTP routes
-```
+The bank receives the command, executes the trade, and sends a response. The response arrives. Everything is clear.
 
-`rfqd` can be tested without HTTP. That's clean architecture.
+The bank never receives the command. The network dropped it. `rfqd` gets an error. Everything is clear.
 
----
+The bank receives the command and executes the trade. But the response is lost in the network. `rfqd` waits, times out, and doesn't know whether the trade happened.
 
-## 1.5 Microservices vs Monoliths — The Real Trade-Off
+The third case is the hard one. The trade might have happened or might not have. If `rfqd` retries, it might execute the same trade twice. If `rfqd` doesn't retry, the trade might be lost.
 
-### Monolith
+There is no way to distinguish "the bank is slow" from "the bank is down" from "the network is broken." All three look the same: no response.
 
-**Use when:**
-- Team is small
-- Product is new
-- Traffic is low
-- Deploying everything together is fine
+This is why idempotency matters. This is why the UNKNOWN state matters. This is why deduplication matters. These are not academic concerns. They're the practical reality of building systems that talk to other systems over a network.
 
-**Pain point:** Code becomes tangled over time. Changing one thing breaks another. Deployment becomes scary.
-
-### Microservices
-
-**Use when:**
-- Team is large
-- You need independent deployment
-- Parts have very different scaling needs
-- You can afford the operational complexity
-
-**Pain point:** Distributed systems are hard. Network failures, data consistency, debugging across services.
-
-### The Middle Ground: Modular Monolith
-
-**Use when:**
-- You want clean boundaries
-- But don't need independent deployment yet
-- You may split later
-
-**This is what your boss wanted.** `rfq_api2` + `rfqd` + libraries is a modular monolith. Clean boundaries, one deployment.
+Your work on locking, dedup, and UNKNOWN state is not over-engineering. It's the minimum necessary to handle the reality of distributed systems. The mistake was not in building those protections. The mistake was in building them without explaining to your team why they were necessary.
 
 ---
 
-## 1.6 Distributed Systems — The Hard Parts
+## 1.8 API Design
 
-Distributed systems are hard because **the network is unreliable**.
+An API is a contract. It's a promise you make to your clients about how they can interact with your system. And like any contract, it should be clear, stable, and hard to break accidentally.
 
-### The Fallacies of Distributed Computing
+REST is the most common style for HTTP APIs. The core idea is that you expose resources, not actions. A resource is a thing — an RFQ, a bank, a client. Each resource has a URL. You interact with resources using HTTP methods: GET to read, POST to create, PUT to update, DELETE to remove.
 
-Everyone assumes:
+The power of REST is that it's predictable. If you know the resource is `/v1/rfq`, you can guess that GET retrieves it, POST creates a new one, PUT updates it, and DELETE removes it. The HTTP method tells you what's happening without you having to read the documentation.
 
-1. The network is reliable ❌
-2. Latency is zero ❌
-3. Bandwidth is infinite ❌
-4. The network is secure ❌
-5. Topology doesn't change ❌
-6. There's one administrator ❌
-7. Transport cost is zero ❌
-8. The network is homogeneous ❌
+HTTP status codes are part of the contract. They tell the client what happened. 200 means success. 201 means created. 400 means the client sent something wrong. 401 means the client needs to authenticate. 403 means the client is authenticated but not allowed. 404 means the resource doesn't exist. 409 means conflict — the resource is in the wrong state for the requested operation. 422 means the payload is syntactically correct but semantically wrong. 500 means the server crashed. 502 means an upstream service failed. 503 means the service is unavailable. 504 means a timeout occurred.
 
-**All false.** A senior engineer designs for failure, not for the happy path.
+The status code is not an afterthought. It's part of the contract. If your frontend expects a 404 when an RFQ doesn't exist, and you return a 500 instead, the frontend will misbehave. This is why parity with legacy matters. The legacy system returned specific status codes for specific situations, and the new system must return the same codes. Otherwise the frontend breaks.
 
-### What This Means for You
+SSE — Server-Sent Events — is a way for the server to push events to the client over a simple HTTP connection. The client opens the connection and the server sends events as they happen. Your `/quotefeed` endpoint uses SSE to stream price updates to the frontend.
 
-- **Redis can go down** — your code must handle it
-- **Messages can be lost** — you need ACK and redelivery
-- **Commands can arrive twice** — you need idempotency
-- **Services can crash mid-operation** — you need recovery
-- **Timeouts are normal** — you need UNKNOWN states
+SSE is one-directional: server to client. The client can't send events back over the same connection. If you need bidirectional communication, you need WebSocket. But WebSocket is more complex, requires a persistent connection, and has different infrastructure needs. Your boss made the architectural decision to avoid WebSocket, and that's a reasonable choice for price streaming. SSE is simpler and sufficient for pushing updates.
 
-Your `rfqd` with locking, dedup, and UNKNOWN state is **exactly this kind of thinking**.
+The key to good API design is to treat the API as a promise to your clients. Once you publish an API, people depend on it. Changing it breaks their code. So you must be careful: version your APIs, maintain backward compatibility, document everything, and test your contract. Your parity tests are exactly this — they verify that the new system honors the same contract as the legacy system.
 
 ---
 
-## 1.7 API Design
+## 1.9 Data Architecture
 
-### REST APIs
+Every system has data. The questions are: where does it live, how does it move, and who owns it?
 
-**Core principles:**
+The most important principle is the single source of truth. There should be one place where the canonical state of the system lives. Everything else is a copy, a cache, or a projection.
 
-1. **Resources, not actions** — `POST /rfq` not `POST /createRfq`
-2. **HTTP verbs have meaning** — GET reads, POST creates, PUT updates, DELETE removes
-3. **Status codes are semantics** — 200 OK, 201 Created, 400 Bad Request, 404 Not Found, 409 Conflict, 422 Unprocessable, 500 Server Error, 502 Bad Gateway, 503 Unavailable, 504 Timeout
-4. **Stateless** — each request contains all needed info
-5. **Versioned** — `/v1/` prefix or header
+In your system, the orderlog is the source of truth. It holds the canonical state of every RFQ: its status, its price, its quotes, its spread. If you want to know the true state of an RFQ, you look at the orderlog.
 
-### SSE (Server-Sent Events)
+Redis is not the source of truth. It's a cache and a message bus. It holds data temporarily to speed up access or to move messages between components. If Redis dies, the source of truth — the orderlog — still has the real state.
 
-**What:** Server pushes events to client over HTTP. One-way: server → client.
+This distinction matters because it tells you what to trust. If Redis and the orderlog disagree, the orderlog wins. If the orderlog says the RFQ is DEAL but Redis still has it as QUOTE, the orderlog is right. The cache is stale.
 
-**When to use:** Price updates, notifications, any stream of events.
+This is why your design should always be able to rebuild the cache from the source of truth. If Redis is wiped, you should be able to repopulate it from the orderlog. If you can't, then Redis was holding state that should have been in the source of truth.
 
-**Your `/quotefeed` endpoint is SSE.** The frontend opens a connection, and the server sends `QUOTE_EVENT` frames.
+The same principle applies to data flows. Data should flow from the source of truth outward. When an RFQ changes state, that change is written to the orderlog first, then published as an event, then cached in Redis if needed. Not the other way around.
 
-### WebSocket
-
-**What:** Bidirectional, persistent connection. Both sides can send.
-
-**When to use:** Chat, games, collaborative editing.
-
-**Your boss banned WebSocket for the RFQ.** That's an architectural decision — SSE is enough for price streaming.
+This is the principle that your design draft captures when it says that `rfqd` must persist before publishing events. The event should represent the canonical state that is already saved, not a state that hasn't been persisted yet. Otherwise you risk publishing an event for a state change that never got saved.
 
 ---
 
-## 1.8 Data Architecture
+## 1.10 Messaging
 
-### How Data Flows
+When components need to communicate, they have choices. They can call each other directly, or they can communicate through messages.
 
-```text
-Source of truth (orderlog)
-   ↓
-Read/write by services (rfqd)
-   ↓
-Cached where needed (Redis)
-   ↓
-Projected for display (SSE events)
-```
+Direct calls are synchronous. Component A calls Component B and waits for the response. This is simple and easy to reason about, but it creates coupling. If Component B is slow, Component A is slow. If Component B is down, Component A fails.
 
-### The Single Source of Truth
+Messaging decouples components. Component A sends a message to a queue and moves on. Component B picks up the message when it's ready. If Component B is slow, the message waits. If Component B is down, the message stays in the queue until B comes back.
 
-**Rule:** One place is the canonical source. Everything else is a copy or projection.
+This is the pattern your `rfqd` uses. The API sends a command to Redis. `rfqd` picks it up, processes it, and sends a response. The API and `rfqd` are decoupled by the queue. They don't call each other directly.
 
-**In your system:** The orderlog is the source of truth. Redis is a cache and bus. The SSE stream is a projection. If Redis dies, the orderlog still has the state.
+Message queues come in different flavors. A simple list is just that — a list of messages. A consumer pops one off, processes it, and it's gone. Redis Lists with BLPOP work this way. The problem is durability: if the consumer crashes after popping but before processing, the message is lost.
 
----
+Redis Streams solve this with acknowledgments. A consumer reads a message, processes it, and then sends an ACK. Until the ACK is received, the message stays in a "pending" state and can be redelivered to another consumer. This gives you at-least-once delivery: messages will be delivered, but possibly more than once.
 
-## 1.9 Messaging
+At-least-once delivery requires idempotency. If a message can be delivered twice, the consumer must be able to handle the duplicate without causing harm. That's why your `execute` command has a `command_id` and dedup logic. The same command can arrive twice, but it only executes once.
 
-### Message Queue vs Pub/Sub
+Pub/Sub is different from a queue. In a queue, each message goes to one consumer. In pub/sub, each message goes to all subscribers. Pub/sub is for events — "this happened" — while queues are for work — "please do this."
 
-| | Message Queue | Pub/Sub |
-|---|---|---|
-| **Delivery** | One consumer gets each message | All subscribers get each message |
-| **Use case** | Commands, task distribution | Events, notifications |
-| **Your example** | `rfqd:commands` queue | Quote updates channel |
+Your system needs both. Commands — new, execute, cancel — go through a queue. Each command should be processed by exactly one worker. Events — price updates, state changes — go through pub/sub. Every interested subscriber should receive the event.
 
-### At-Least-Once vs At-Most-Once vs Exactly-Once
-
-| Guarantee | What It Means | Reality |
-|---|---|---|
-| **At-Most-Once** | Message may be lost | Simple, but dangerous |
-| **At-Least-Once** | Message may be duplicated | Need idempotency |
-| **Exactly-Once** | Impossible in practice | Marketing lie |
-
-**Your system:** Use at-least-once + idempotency. That's the standard, proven approach.
+The distinction matters because the guarantees are different. A queue gives you at-least-once delivery to one consumer. Pub/sub gives you at-most-once delivery to many subscribers. If a subscriber is down during a pub/sub message, it misses the message. That's why your draft suggests the orderlog as a snapshot: if a subscriber misses events, it can recover by reading the current state from the orderlog.
 
 ---
 
-## 1.10 Consistency and Transactions
+## 1.11 Consistency and Transactions
 
-### ACID (Relational Databases)
+Consistency is the property that the system is always in a valid state. When an RFQ transitions from QUOTE to DEAL, that transition should be atomic: either it happens completely, or it doesn't happen at all. There should never be a moment where the RFQ is half-DEAL and half-QUOTE.
 
-| Property | What It Means |
-|---|---|
-| **Atomicity** | All or nothing — a transaction fully completes or fully fails |
-| **Consistency** | Database moves from one valid state to another |
-| **Isolation** | Concurrent transactions don't interfere |
-| **Durability** | Committed data survives crashes |
+In a single database, transactions provide this guarantee. ACID transactions ensure atomicity, consistency, isolation, and durability. You wrap your operations in a transaction, and the database guarantees that they either all succeed or all fail.
 
-### BASE (Distributed Systems)
+In a distributed system, transactions are much harder. There's no single database to coordinate the transaction. You have multiple services, each with its own database, and they need to agree on the outcome. This is the distributed transaction problem, and it's genuinely hard.
 
-| Property | What It Means |
-|---|---|
-| **Basically Available** | System responds, even if stale |
-| **Soft state** | State may change without input |
-| **Eventually consistent** | Data will converge over time |
+The solution most systems use is to avoid distributed transactions entirely. Instead of trying to atomically update multiple services, you use events and eventual consistency. You update one service, publish an event, and let other services react to the event. The system is not consistent at every moment — there's a period where one service has updated and another hasn't. But eventually, all services converge on the same state.
 
-### Which to Use
+For financial systems like yours, consistency is non-negotiable. A trade must be recorded correctly or not at all. You can't have a trade that's half-executed. That's why your `execute` flow uses locks and dedup. The lock ensures that only one worker executes a given RFQ at a time. The dedup ensures that the execution happens exactly once.
 
-- **Financial transaction (execute trade):** ACID — you need certainty
-- **Quote update (price stream):** BASE — eventual consistency is fine
+The key insight is that you don't need consistency everywhere. You need it where it matters. For the quote stream, eventual consistency is fine — a slightly stale price is acceptable. For the execute flow, strong consistency is required — a trade must be atomic.
+
+The senior engineer knows where consistency is required and where it's not. They apply strong consistency to the critical paths and accept eventual consistency elsewhere. Applying strong consistency everywhere makes the system slow and complex. Applying weak consistency everywhere risks data corruption. The skill is knowing the difference.
 
 ---
 
-## 1.11 Scalability
+## 1.12 Scalability, Availability, and Fault Tolerance
 
-### Vertical Scaling (Scale Up)
+These three concepts are related but distinct.
 
-**What:** Make the machine bigger — more CPU, more RAM.
+Scalability is the ability to handle more load by adding resources. Vertical scaling means making a machine bigger. Horizontal scaling means adding more machines. Vertical scaling is simple but has a ceiling. Horizontal scaling is more complex but can grow indefinitely.
 
-**Limits:** There's a ceiling. You can't grow forever.
+Your single `rfqd` worker is vertically scaled — it runs on one process. If you need more throughput, you can either make the process faster (vertical) or run multiple workers (horizontal). Multiple workers is the right answer for your system, but it introduces the need for coordination: if two workers can process the same RFQ simultaneously, you need locks and idempotency to prevent corruption.
 
-### Horizontal Scaling (Scale Out)
+Availability is the ability to respond when needed. It's measured in nines: 99% availability means about 3.65 days of downtime per year. 99.9% means about 8.76 hours. 99.99% means about 52 minutes. Each additional nine is exponentially harder to achieve.
 
-**What:** Add more machines. Run multiple instances.
+Fault tolerance is the ability to continue working when parts fail. A fault-tolerant system doesn't crash when one component goes down. It degrades gracefully: some features might be unavailable, but the system as a whole keeps working.
 
-**Challenge:** Coordination between instances.
+The patterns for fault tolerance include retries (try again after a failure), circuit breakers (stop calling a failing service), timeouts (give up after a while), fallbacks (use an alternative when the primary fails), and bulkheads (isolate failures so they don't spread).
 
-**Your multi-worker plan** for `rfqd` is horizontal scaling — multiple `rfqd` processes consuming the same queue.
+Your system has several of these. Timeouts on bank calls prevent hanging forever. The UNKNOWN state handles the case where a timeout occurs but the operation may have succeeded. The backup strategy for quote streaming — read from the orderlog if you miss events — is a fallback.
 
-### The Bottleneck Pattern
-
-```text
-One slow thing → blocks everything behind it
-```
-
-Your single `rfqd` worker is a bottleneck. Multiple workers remove it — but introduce the need for locking and idempotency.
-
----
-
-## 1.12 Availability and Fault Tolerance
-
-### Availability
-
-**What:** The system responds when you need it.
-
-**Measured in nines:**
-
-| Nines | Downtime per year |
-|---|---|
-| 99% | 3.65 days |
-| 99.9% | 8.76 hours |
-| 99.99% | 52.6 minutes |
-| 99.999% | 5.26 minutes |
-
-### Fault Tolerance
-
-**What:** The system continues to work even when parts fail.
-
-**Patterns:**
-
-| Pattern | What It Does | Your Example |
-|---|---|---|
-| **Retry** | Try again after failure | Retry a failed command |
-| **Circuit breaker** | Stop calling a failing service | Stop calling OctaX if it's down |
-| **Timeout** | Give up after N seconds | 5s timeout on bank calls |
-| **Fallback** | Use alternative when primary fails | Internal desk when bank unavailable |
-| **Bulkhead** | Isolate failures | Separate queues for commands |
+The senior engineer designs for failure. Not because failure is likely, but because it's inevitable. At scale, rare failures happen constantly. A one-in-a-million failure happens a thousand times if you have a billion requests. Designing for failure is not pessimism. It's realism.
 
 ---
 
 ## 1.13 Caching
 
-### What to Cache
+Caching is the practice of storing a copy of data in a faster location so you can access it more quickly.
 
-- Data that's read often, written rarely
-- Results of expensive computations
-- Data from slow external services
+The most common cache is memory. Reading from memory is about a thousand times faster than reading from disk. So if you have data that's read frequently and changes rarely, you cache it in memory. Instead of hitting the database every time, you hit the cache.
 
-### Where to Cache
+Redis is a popular caching layer. It's an in-memory data store that's fast and simple. You store key-value pairs with an optional expiration time. When the data expires, the cache is invalidated and the next read goes back to the source of truth.
 
-```text
-Client (browser)
-   ↓
-CDN (edge)
-   ↓
-Application cache (Redis)
-   ↓
-Database (materialized views)
-```
+The hard part of caching is invalidation. When the source of truth changes, how does the cache know? If the cache doesn't know, it serves stale data. If it invalidates too aggressively, you lose the benefit of caching.
 
-### Cache Invalidation
+The simplest invalidation strategy is time-to-live (TTL). You store data in the cache with an expiration time. When the time passes, the data is discarded and the next read goes to the source of truth. This is simple and effective for data that changes slowly, like configuration or tokens.
 
-**The hard problem:** When data changes, how does the cache know?
+For data that changes quickly and unpredictably, TTL is not enough. You need event-driven invalidation: when the source of truth changes, publish an event that tells the cache to invalidate. This is more complex but ensures the cache is always fresh.
 
-**Rules:**
-- Short TTL for fast-changing data (prices)
-- Event-driven invalidation when data changes
-- Version numbers or timestamps to detect staleness
+Your Braza session tokens are a good example of caching. You store the JWT in Redis with a TTL. When the token expires, the next request logs in again and gets a new token. The cache prevents you from logging in for every request, while the TTL ensures you don't use an expired token.
 
-**In your system:** Redis is the cache and bus. The orderlog is the source of truth. If Redis and orderlog disagree, the orderlog wins.
+The principle is: cache what you read often, invalidate when it changes, and always be able to rebuild from the source of truth.
 
 ---
 
 ## 1.14 Security Architecture
 
-### The Security Principles
+Security is not a feature. It's a property of the entire system. A system is either secure or it isn't, and one vulnerability can compromise everything.
 
-| Principle | What It Means |
-|---|---|
-| **Least privilege** | Give only the access needed |
-| **Defense in depth** | Multiple layers of protection |
-| **Never trust input** | Validate everything from clients |
-| **Secrets outside code** | Credentials in env vars or secret stores |
-| **Encrypt in transit** | HTTPS for all external traffic |
-| **Encrypt at rest** | Encrypt stored sensitive data |
+The fundamental principles of security are simple. Least privilege: give every component only the access it needs, nothing more. Defense in depth: don't rely on a single layer of protection. Never trust input: validate everything that comes from outside. Secrets outside code: credentials belong in environment variables or secret stores, never in source code. Encrypt in transit: use HTTPS for all external traffic. Encrypt at rest: protect stored sensitive data.
 
-### For Your System
+For your system, the most important security concern is bank credentials. The Braza username and password must never appear in the codebase, never be committed to Git, never be logged. They belong in an environment file that is outside the repository, accessible only to the people who need them.
 
-| Concern | Your Approach |
-|---|---|
-| Bank credentials | Env file outside repo, never in Git |
-| Internal Redis | Not exposed publicly |
-| CORS | Should not be wildcard + credentials |
-| Auth tokens | JWT with refresh |
+Your env file pattern handles this correctly. Development uses an empty or sandbox env file. Production uses a real env file stored outside the repository. The code reads from the environment, not from hardcoded values. Secrets never enter Git.
+
+The other major security concern is CORS. Cross-Origin Resource Sharing controls which websites can make requests to your API. If you set `allow_origins=["*"]` with `allow_credentials=True`, you're allowing any website to make authenticated requests to your API. That's a vulnerability. The fix is to specify exact origins or disable credentials for wildcard origins.
+
+Security is often overlooked until there's a breach. The senior engineer treats it as a first-class concern from the beginning.
 
 ---
 
 ## 1.15 Observability
 
-### The Three Pillars
+Observability is the ability to understand what's happening inside your system from the outside. If a user reports a problem, can you figure out what went wrong? If a request fails, can you trace its journey through the system? If performance degrades, can you see where the time is being spent?
 
-| Pillar | What It Answers | Tool |
-|---|---|---|
-| **Logs** | "What happened?" | Structured logs with correlation IDs |
-| **Metrics** | "How much? How fast?" | Prometheus, Grafana |
-| **Traces** | "Where did it go?" | Distributed tracing |
+There are three pillars of observability: logs, metrics, and traces.
 
-### Correlation IDs
+Logs are text records of what happened. They're the most familiar form of observability. When something goes wrong, you look at the logs to see what the system was doing at the time. Good logs are structured: they include consistent fields like correlation ID, timestamp, and severity. Bad logs are free-form text that can't be searched or correlated.
 
-**What:** A single ID that flows through every component for one request.
+Metrics are numbers over time. They tell you how the system is performing: latency, throughput, error rate, queue depth, cache hit rate. Metrics are aggregated and can be graphed to show trends. You can't look at a single metric to debug a problem, but you can look at metrics to see that a problem exists and roughly where it is.
 
-**Why:** You can search one ID and see the entire journey.
+Traces show the journey of a single request through the system. When a request comes in, it's assigned a trace ID. As it flows through components, each component records its part of the trace. At the end, you have a complete picture of the request's journey: how long it spent in each component, where it failed, what it was doing.
 
-**In your system:** `rfq_id`, `command_id`, and `correlation_id` serve this purpose.
+Your system has the beginnings of observability. The `rfq_id`, `command_id`, and `correlation_id` are identifiers that can trace a request through the system. If you search for one `rfq_id` in the logs, you should be able to see every component that touched it.
+
+What's missing is the discipline. Every log statement should include these identifiers. Every component should log its part of the journey. Without that discipline, the identifiers are useless — they exist but aren't consistently used.
+
+The senior engineer treats observability as a feature, not an afterthought. When building a system, they ask: "How will I debug this when it breaks?" And they build the answer into the system from the start.
 
 ---
 
 ## 1.16 Deployment Architecture
 
-### Blue-Green Deployment
+Deployment is how code gets from your machine to production. It seems simple — just copy the files and restart the server — but it's actually one of the most dangerous parts of software engineering.
 
-**What:** Two identical environments. Deploy to blue while green serves. Switch instantly.
+The goal of deployment architecture is to minimize risk. Every deployment introduces the possibility of failure. The question is: how do you deploy changes with minimal risk of breaking production?
 
-**Advantage:** Zero-downtime deploys, instant rollback.
+Blue-green deployment is one answer. You maintain two identical environments: blue and green. One serves production traffic, the other is idle. When you deploy a new version, you deploy it to the idle environment, test it, and then switch traffic. If something goes wrong, you switch back. Rollback is instant because the old version is still running.
 
-### Canary Deployment
+Canary deployment is another answer. You deploy the new version to a small subset of users — say 5%. You watch those users for problems. If they're fine, you increase to 10%, then 25%, then 50%, then 100%. If problems appear, you roll back the canary and only 5% of users were affected.
 
-**What:** Deploy to a small subset (e.g., 5% of users). Watch. Expand gradually.
+Your toggle — `RFQ_VERSION=legacy` or `RFQ_VERSION=new` — is a simple form of blue-green deployment. You can switch between legacy and new instantly. If the new version has problems, you flip the toggle back to legacy and the old system takes over.
 
-**Advantage:** Catch problems before they affect everyone.
+The key to safe deployment is having a rollback plan. Before you deploy, know exactly how to undo the deployment if something goes wrong. Your toggle is the rollback plan. One line changed, and you're back to the old system.
 
-### Rolling Deployment
-
-**What:** Update instances one at a time, always keeping some running.
-
-**Advantage:** No downtime, gradual rollout.
-
-### Your Toggle
-
-Your `RFQ_VERSION=legacy|new` toggle is a **simple form of blue-green**. You can switch between legacy and new instantly. That's exactly what you want for the migration.
+The senior engineer treats deployment as a first-class concern. They design for rollback from the start. They don't deploy on Friday afternoon. They monitor after deployment to catch problems early. They know that every deployment is a risk, and they manage that risk deliberately.
 
 ---
 
-# PART 2: BACKEND ENGINEERING
+# PART 2: BACKEND ENGINEERING — THE COMPLETE PICTURE
 
-Backend engineering is everything that happens **behind the frontend** — the servers, databases, queues, caches, and business logic that make an application work.
+Backend engineering is everything that happens behind the frontend. It's the servers, the databases, the queues, the caches, the business logic. It's the part of the system that users never see but that everything depends on.
 
-A senior backend engineer understands not just **how to write code**, but **how systems behave under load, under failure, and over time**.
+A senior backend engineer is not just someone who can write code. They understand how systems behave under load, how they fail, how they recover, and how to design them so that failure is manageable rather than catastrophic.
+
+This part of the document goes deep into the core of backend engineering. It starts with the fundamental skill of system design, moves through the technologies that make up the modern backend, and ends with the operational concerns that separate a senior engineer from a junior one.
 
 ---
 
 ## 2.1 System Design
 
-System design is the skill of **taking a vague requirement and turning it into a working architecture**.
+System design is the skill of taking a vague requirement and turning it into a working architecture. It's what you do when someone says "build me a system that does X" and you have to figure out what the system looks like.
 
-### The Process
+The first instinct of a junior engineer is to start coding. They hear the requirement and immediately think about functions and classes and variables. That's the wrong place to start.
 
-When asked "design X":
+The senior engineer starts with questions. What exactly does the system need to do? How many users will it have? How much data will it store? What's the acceptable latency? What happens if it fails? What's the budget? These questions seem obvious, but they're almost never asked explicitly. And the answers change the design dramatically.
 
-1. **Clarify requirements** — What does it need to do? How many users? How much data?
-2. **Define scope** — What's in? What's out?
-3. **Sketch the high-level design** — Components and how they talk
-4. **Go deep on the hard parts** — Data model, API, scaling, failures
-5. **Identify trade-offs** — Nothing is free. Say what you're sacrificing.
+A system for a hundred users is designed differently from a system for a million users. A system that can lose a message occasionally is designed differently from a system where every message matters. A system with a ten-second latency budget is designed differently from a system with a ten-millisecond budget.
 
-### The Questions to Always Ask
+The first step in system design is always to clarify requirements. You cannot design a good system if you don't understand what it needs to do. And you cannot understand what it needs to do if you don't ask.
 
-| Question | Why It Matters |
-|---|---|
-| How many users? | Determines scale |
-| How much data? | Determines storage |
-| Read-heavy or write-heavy? | Determines database and cache |
-| What's the latency budget? | Determines sync vs async |
-| What happens if it fails? | Determines reliability design |
-| What's the cost limit? | Determines everything |
+The second step is to sketch the high-level design. What are the major components? How do they talk to each other? Where does data live? How does it flow? At this stage, you're not worried about details. You're worried about shape.
+
+The third step is to go deep on the hard parts. Every system has one or two genuinely difficult problems. Maybe it's scaling the database. Maybe it's handling concurrent writes. Maybe it's ensuring consistency across services. Identify the hard problems and spend your thinking there.
+
+The fourth step is to identify trade-offs. Nothing in system design is free. Every choice has a cost. A database that's great for reads might be bad for writes. A cache that speeds things up might serve stale data. A queue that decouples components might introduce latency. The senior engineer names the trade-offs explicitly rather than pretending they don't exist.
+
+The fifth step is to write it down. A design that exists only in your head is not a design. It's a wish. Write the design down, share it with your team, and let them challenge it. The act of writing forces clarity. The act of sharing forces honesty.
+
+System design is not a one-time activity. It's ongoing. As the system grows and changes, the design evolves. The senior engineer revisits the design regularly, checks whether the assumptions still hold, and adjusts as needed.
 
 ---
 
-## 2.2 APIs and HTTP
+### The Questions That Matter
 
-### The HTTP Request Lifecycle
+Before you design anything, you need to know the answers to several questions. They seem basic, but they're the difference between a design that works and one that doesn't.
 
-```text
-Client → DNS lookup → TCP connection → TLS handshake → HTTP request
-  → Server receives → Routes → Handler → Business logic → Response
-  → Client receives → Parses → Displays
-```
+How many users? This determines scale. A system for a hundred internal users is very different from a system for a million external users. The hundred-user system can probably run on one server. The million-user system needs load balancing, multiple servers, and a distributed architecture.
 
-### HTTP Methods
+How much data? This determines storage. A system that stores a few megabytes of data can use almost anything. A system that stores terabytes needs careful database design, indexing, partitioning, and retention policies.
 
-| Method | Purpose | Idempotent? | Safe? |
-|---|---|---|---|
-| GET | Read | ✅ Yes | ✅ Yes |
-| POST | Create/action | ❌ No | ❌ No |
-| PUT | Replace | ✅ Yes | ❌ No |
-| PATCH | Partial update | ❌ No | ❌ No |
-| DELETE | Remove | ✅ Yes | ❌ No |
+Is it read-heavy or write-heavy? This determines the database and cache strategy. A read-heavy system benefits from caching and read replicas. A write-heavy system needs careful transaction design and possibly partitioning.
 
-**Idempotent:** Repeating the request has the same effect as doing it once.
+What's the latency budget? This determines sync versus async. If the user expects a response in 100 milliseconds, you can't do a dozen sequential network calls. If the user can wait a few seconds, you have more room.
 
-**Safe:** Doesn't change server state.
+What happens if it fails? This determines reliability design. If failure means lost money, you need transactions, idempotency, and careful recovery. If failure means the user retries, you can be more relaxed.
 
-**Why this matters:** For `execute` (POST), the client might retry. Your server must handle duplicates. That's why you built idempotency.
+What's the cost limit? This determines everything. A startup with a small budget can't afford a multi-region deployment with five nines of availability. A bank can't afford to lose a transaction. Budget shapes architecture.
 
-### HTTP Status Codes
-
-| Range | Meaning | Examples |
-|---|---|---|
-| 2xx | Success | 200 OK, 201 Created, 204 No Content |
-| 3xx | Redirect | 301 Permanent, 302 Temporary |
-| 4xx | Client error | 400 Bad Request, 401 Unauthorized, 403 Forbidden, 404 Not Found, 409 Conflict, 422 Unprocessable |
-| 5xx | Server error | 500 Internal, 502 Bad Gateway, 503 Unavailable, 504 Timeout |
-
-**Senior instinct:** The status code is part of the contract. The frontend depends on it. Changing 409 to 422 breaks clients.
+These questions are the foundation of system design. Ask them first. Answer them explicitly. Write them down. They will guide every decision that follows.
 
 ---
 
-## 2.3 Distributed Systems — The Hard Parts
+### The Architecture of Your RFQ System
 
-### The Fundamental Problem
+Your RFQ system is a good example of system design in practice. Let's walk through it.
 
-**You cannot distinguish between:**
-- A service that is slow
-- A service that is down
-- A network that is broken
+The requirement: a system that receives RFQ requests from a frontend, routes them to the appropriate institution, gets quotes back, and streams them to the user. The system must handle multiple institutions, must not lose trades, must not execute the same trade twice, and must be migration-ready from a legacy system.
 
-All three look the same: **no response**.
+The components: `rfq_api2` is the HTTP facade. It receives requests from the frontend, validates them, and translates them into neutral commands. It doesn't know about banks. `rfqd` is the workflow engine. It receives commands, orchestrates the request through the appropriate adapter, persists state, and returns results. The institution libraries are isolated modules that know how to talk to specific banks. Redis is the message bus. The orderlog is the source of truth.
+
+The hard problems: concurrency (multiple RFQs being processed simultaneously), idempotency (the same command arriving twice must not execute twice), durability (a command must not be lost if a worker crashes), and parity (the new system must produce the same results as the legacy system).
+
+The trade-offs: a queue decouples the API from the daemon but adds latency. Libraries isolate bank protocols but add indirection. Locking prevents corruption but adds complexity. Idempotency prevents duplicates but requires storage. Each of these is a trade-off, and each was made deliberately.
+
+This is system design. It's not magic. It's asking the right questions, identifying the hard problems, making deliberate trade-offs, and writing it all down.
+
+---
+
+## 2.2 HTTP and APIs
+
+HTTP is the protocol that powers the web. Every time a browser loads a page, it's making HTTP requests. Every time a frontend calls a backend API, it's using HTTP. Understanding HTTP deeply is essential for backend engineering.
+
+An HTTP request has a method, a URL, headers, and an optional body. The method says what kind of operation is being performed. The URL says what resource is being accessed. The headers carry metadata — authentication, content type, caching directives. The body carries data — the payload of a POST or PUT.
+
+The most common HTTP methods are GET, POST, PUT, PATCH, and DELETE. GET reads a resource. POST creates a resource or performs an action. PUT replaces a resource. PATCH partially updates a resource. DELETE removes a resource.
+
+Two concepts matter for API design: idempotency and safety. An idempotent operation is one that can be repeated without changing the result. GET is idempotent — reading the same resource twice gives the same result. PUT is idempotent — replacing a resource with the same data twice is the same as doing it once. DELETE is idempotent — deleting something twice is the same as deleting it once. POST is not idempotent — creating a resource twice creates two resources.
+
+A safe operation is one that doesn't change server state. GET is safe — it only reads. POST, PUT, and DELETE are not safe — they change state.
+
+Why does this matter? Because of retries. In a distributed system, clients retry requests that fail or time out. If the operation is idempotent, retrying is safe. If it's not idempotent — like a POST that creates a trade — retrying could create a duplicate trade. That's why your `execute` command has a `command_id`. The `command_id` makes the operation idempotent: if the same command arrives twice, the second one is recognized as a duplicate and not executed again.
+
+HTTP status codes are part of the API contract. They tell the client what happened. 200 means success. 201 means created. 204 means success with no content. 400 means the client sent something invalid. 401 means the client isn't authenticated. 403 means the client is authenticated but not allowed. 404 means the resource doesn't exist. 409 means conflict — the resource is in the wrong state. 422 means the payload is syntactically valid but semantically wrong. 500 means the server crashed. 502 means an upstream service failed. 503 means the service is unavailable. 504 means a timeout occurred.
+
+The status code is not an afterthought. It's a promise to the client. If your frontend expects a 404 when an RFQ doesn't exist, and you return a 500 instead, the frontend will misbehave. It might show an error message when it should show "not found." It might retry when it shouldn't. The status code matters.
+
+This is why parity with legacy is important. The legacy system returned specific status codes for specific situations. The new system must return the same codes. Otherwise the frontend — which was built against the legacy contract — will break.
+
+---
+
+### SSE — Server-Sent Events
+
+SSE is a simple way for a server to push events to a client over HTTP. The client opens a connection with a GET request, and the server keeps the connection open and sends events as they happen.
+
+Your `/quotefeed` endpoint uses SSE. The frontend opens a connection, and the server streams price updates as they arrive. Each event has a format: `event: QUOTE_EVENT` followed by `data: {json}` followed by a blank line.
+
+SSE is one-directional. The server can send events to the client, but the client can't send events back over the same connection. For price streaming, that's fine — the client just needs to receive updates.
+
+SSE is simpler than WebSocket. It runs over regular HTTP, works with standard infrastructure, and doesn't require a special protocol. The client just opens a connection and listens. If the connection drops, the client can reconnect.
+
+The trade-off is that SSE is one-directional and has some limitations around reconnection and event replay. But for the use case of streaming prices to a frontend, it's the right tool.
+
+Your boss made the architectural decision to use SSE rather than WebSocket. That's a reasonable choice. SSE is simpler, works with existing infrastructure, and is sufficient for price streaming.
+
+---
+
+## 2.3 Distributed Systems in Depth
+
+Once you have more than one process talking over a network, you have a distributed system. And distributed systems are fundamentally different from single-process systems.
+
+In a single process, a function call either works or it throws an exception. There's no ambiguity. If the function returns, it worked. If it throws, it didn't.
+
+In a distributed system, a network call can do several things. It can succeed — the response comes back and everything is clear. It can fail — the connection is refused or the request times out and you get an error. It can hang — the request is sent but no response ever comes. Or, most confusingly, it can succeed but you never find out because the response got lost.
+
+The last case is the one that makes distributed systems hard. The operation happened. The trade executed. The data was saved. But the response was lost, so the caller doesn't know. The caller times out and has to decide: did the operation happen or not?
+
+There is no way to tell from the outside. "The service is slow" and "the service is down" and "the network is broken" all look identical: no response.
+
+This is the fundamental challenge that your `rfqd` with its UNKNOWN state is trying to address. When `rfqd` sends an execute command to a bank, and the bank doesn't respond in time, `rfqd` doesn't know whether the trade happened. It marks the state as UNKNOWN — not DEAL, not FAILED, just uncertain. Later, it can try to look up the execution and reconcile.
+
+This is not over-engineering. It's the minimum necessary to handle the reality of distributed systems. The alternative — assuming the operation failed and retrying — risks executing the same trade twice. The alternative — assuming the operation succeeded and marking it DEAL — risks reporting a trade that never happened. The UNKNOWN state is the honest answer: "we don't know yet."
+
+---
 
 ### Timeouts
 
-A timeout is your **guess** about how long to wait.
+A timeout is your guess about how long to wait before giving up. It seems simple, but it's actually one of the hardest decisions in distributed systems.
 
-**Too short:** You give up on slow-but-working requests.
+If your timeout is too short, you give up on operations that would have succeeded if you'd waited a little longer. A bank might be slow but not down. You time out, mark the state UNKNOWN, and later discover the trade actually went through.
 
-**Too long:** You waste resources waiting for dead requests.
+If your timeout is too long, you waste resources waiting for operations that will never complete. A bank might be down. You wait 30 seconds for a response that will never come, tying up a worker that could be processing other requests.
 
-**Rule:** Timeouts should be explicit, not infinite. Your `QUOTE_READ_TIMEOUT` is a good example.
+There's no correct answer. The timeout should be based on what you know about the service: its typical latency, its worst-case latency under load, and the cost of giving up early versus waiting too long.
+
+Your `QUOTE_READ_TIMEOUT` of 5 seconds is a reasonable choice. It's long enough for most quote requests to complete but short enough that a hung request doesn't tie up the worker forever.
+
+---
 
 ### Retries
 
-**When to retry:**
-- Idempotent operations (GET, PUT)
-- When failure is likely transient (network hiccup)
+Retries are how you handle transient failures. If a request fails because the network hiccuped, retrying might succeed. If a service was briefly overloaded, retrying after a moment might work.
 
-**When NOT to retry:**
-- Non-idempotent operations (POST that creates)
-- When the side effect may have already happened
+But retries are dangerous when the operation is not idempotent. If you send an execute command to a bank, and the bank executes the trade but the response gets lost, retrying the command could execute the same trade twice.
 
-**Your `execute` retry is dangerous.** If the bank executed but the response was lost, retrying could execute twice. That's why you built dedup.
+The rule is: only retry idempotent operations. For non-idempotent operations like execute, use an idempotency key so that retries are safe. The `command_id` in your system serves this purpose. The same command can be retried, but it's recognized as the same command and not executed twice.
+
+The other rule is: don't retry forever. After a certain number of attempts, give up and surface the error. Retrying forever wastes resources and can make a bad situation worse by hammering a service that's already struggling.
+
+---
 
 ### The Idempotency Key
 
-**What:** A stable identifier for a business operation. Same key = same operation.
+The idempotency key is one of the most important patterns in distributed systems. It's a stable identifier that represents a business operation. The same operation always has the same key. If the key is seen twice, the second occurrence is a duplicate and should not be processed again.
 
-**How it works:**
+In your system, the `command_id` is the idempotency key. When a client sends an execute command, it generates a `command_id`. If the command times out and the client retries, the retry has the same `command_id`. `rfqd` sees the `command_id`, checks whether it has already processed that command, and if so, returns the stored result instead of executing again.
 
-```text
-First attempt: execute(command_id=abc) → bank executes → save result
-Retry:         execute(command_id=abc) → find saved result → return it, don't execute again
-```
+Without the idempotency key, the retry would be indistinguishable from a new command. `rfqd` would execute the trade again, and the client would have two trades instead of one.
 
-**In your system:** `execution_intent_id` is the idempotency key for `execute`.
+The idempotency key is not optional for financial systems. It's the only thing that makes retries safe.
 
 ---
 
-## 2.4 Databases and SQL
+## 2.4 Databases
+
+Databases are where your data lives. If your application crashes, you can restart it. If your database crashes and you don't have a backup, your data is gone forever.
+
+A senior engineer treats the database as a critical system, not just a place to dump data. They think about schema design, indexing, transactions, and performance. They know that a poorly designed database will cause problems for years.
 
 ### Relational Databases
 
-**What:** Data in tables with rows and columns. Relationships between tables.
+A relational database stores data in tables. Each table has rows and columns. Tables relate to each other through keys.
 
-**Examples:** PostgreSQL, MySQL, SQLite.
+The relational model is based on decades of theory and practice. It's the most mature and well-understood data model. It enforces structure through schemas, integrity through constraints, and consistency through transactions.
 
-**When to use:**
-- Structured data with relationships
-- Transactions needed (ACID)
-- Complex queries (JOINs, aggregations)
-- Data integrity is critical
+PostgreSQL is the leading open-source relational database. MySQL is another popular choice. SQLite is a lightweight option for embedded use. For most applications, PostgreSQL is the right default choice.
 
-### Core SQL
+The strength of relational databases is that they enforce data integrity. You can't insert a row with a duplicate primary key. You can't delete a parent row while child rows still reference it — unless you explicitly set up cascade deletes. You can't put a string in an integer column. The database enforces these rules, so your application code doesn't have to.
 
-```sql
--- Read
-SELECT rfq_id, rfq_status FROM rfq WHERE rfq_id = '123';
+The weakness is that relational databases are harder to scale horizontally. You can scale reads with replicas, but writes all go to the primary. For write-heavy workloads, a relational database can become a bottleneck. That's when you consider NoSQL options or partitioning.
 
--- Create
-INSERT INTO rfq (rfq_id, rfq_status) VALUES ('123', 'QUOTE');
+### Schema Design
 
--- Update
-UPDATE rfq SET rfq_status = 'DEAL' WHERE rfq_id = '123';
+Schema design is the art of organizing data into tables. The goal is to model the business accurately while minimizing redundancy and maximizing query efficiency.
 
--- Delete
-DELETE FROM rfq WHERE rfq_id = '123';
+The first step is to identify entities. In your system, the entities include banks, brokers, clients, RFQs, and quotes. Each entity becomes a table.
 
--- Join
-SELECT r.rfq_id, b.bank_name
-FROM rfq r
-JOIN bank b ON r.bank_id = b.bank_id;
+The second step is to define relationships. A broker has many clients. A client has many RFQs. An RFQ has many quotes. Each relationship becomes a foreign key.
 
--- Aggregate
-SELECT bank_id, COUNT(*) FROM rfq GROUP BY bank_id;
-```
+The third step is to choose primary keys. A primary key uniquely identifies a row. Natural keys are identifiers that exist in the business domain, like a client's CNPJ. Surrogate keys are generated identifiers, like a UUID. Natural keys are meaningful but can change. Surrogate keys are stable but meaningless. The choice depends on the domain.
 
-### Indexes
+The fourth step is to add constraints. Constraints enforce data integrity. NOT NULL prevents missing values. UNIQUE prevents duplicates. CHECK validates values. FOREIGN KEY enforces relationships.
 
-**What:** Data structure that speeds up reads. Like a book index — instead of scanning every page, you go to the right page.
+A well-designed schema makes the application simpler because the database enforces the rules. A poorly designed schema forces the application to enforce rules in code, which is error-prone.
 
-**When to use:**
-- Columns used in WHERE clauses
-- Columns used in JOINs
-- Columns used in ORDER BY
+### Normalization
 
-**Cost:** Indexes slow down writes (every INSERT/UPDATE must update the index) and use disk space.
+Normalization is the process of organizing data to reduce redundancy. The goal is to store each fact once, not multiple times.
 
-**Rule:** Index for reads you do often. Don't index everything.
+The first normal form says that each column should contain atomic values — no lists or sets. The second normal form says that non-key columns should depend on the whole key. The third normal form says that non-key columns should depend only on the key, not on other non-key columns.
 
-### Transactions
+The benefit of normalization is that data doesn't get out of sync. If a bank's name is stored once, changing it changes it everywhere. If it's stored in a hundred places, changing it requires a hundred updates and the risk that some of them get missed.
 
-**What:** A group of operations that succeed together or fail together.
+The cost of normalization is that queries become more complex. You need JOINs to combine data from multiple tables. JOINs are slower than reading from a single table.
 
-```sql
-BEGIN;
-  UPDATE rfq SET rfq_status = 'DEAL' WHERE rfq_id = '123';
-  INSERT INTO execution (rfq_id, price) VALUES ('123', 5.10);
-COMMIT;
-```
+Denormalization is the deliberate reversal of normalization for performance. You store redundant data to speed up reads. The cost is that the redundant data can get out of sync, so you need processes to keep it consistent.
 
-If anything fails, everything rolls back. No partial state.
-
-**In your system:** The orderlog is your "database." When `rfqd` transitions state, it should be atomic — one write, not many partial writes.
+The rule of thumb: start normalized. Denormalize only when you've measured a real performance problem and identified the specific query that's slow.
 
 ---
 
-## 2.5 Caching and Redis
+## 2.5 Caching
 
-### What to Cache
+Caching is the practice of storing a copy of data in a faster location. The most common cache is memory, which is about a thousand times faster than disk.
 
-- **Hot data** — read often, written rarely
-- **Expensive queries** — results that take long to compute
-- **External responses** — data from slow APIs
+The purpose of caching is to reduce latency and load. If data is read often and changes rarely, you can cache it. Instead of hitting the database every time, you hit the cache. The first read goes to the database and populates the cache. Subsequent reads go to the cache and return instantly.
 
-### Redis Patterns
+Redis is the most popular caching layer. It's an in-memory data store that's simple, fast, and versatile. You store key-value pairs with optional expiration. When the expiration passes, the data is discarded and the next read goes back to the source.
 
-| Pattern | What It Does | Your Example |
-|---|---|---|
-| **Cache** | Store computed values with TTL | Braza session tokens |
-| **Queue** | Push/pop work items | `rfqd:commands` |
-| **Lock** | Distributed mutual exclusion | Per-RFQ lock |
-| **Dedup** | Remember seen items | `execution_intent_id` |
-| **Pub/Sub** | Broadcast events | Quote updates (target) |
+The hard part of caching is invalidation. When the source of truth changes, how does the cache know? If it doesn't know, it serves stale data. If it invalidates too aggressively, it loses the benefit of caching.
 
-### Cache Invalidation
+Time-to-live is the simplest invalidation strategy. You store data with an expiration time. When the time passes, the data is gone. This works well for data that changes slowly, like configuration or session tokens.
 
-**The hard problem in two sentences:** When data changes in the source of truth, how does the cache know? If the cache is stale, users see old data.
+Event-driven invalidation is more complex but more accurate. When the source of truth changes, you publish an event. Cache subscribers hear the event and invalidate their copies. This keeps the cache fresh but requires infrastructure for events.
 
-**Solutions:**
-
-| Solution | How It Works | When to Use |
-|---|---|---|
-| **TTL** | Data expires after N seconds | Prices, tokens |
-| **Write-through** | Update cache on every write | When you need fresh reads immediately |
-| **Event-driven** | Publish "data changed" event | When multiple caches need invalidation |
+The principle: cache what you read often, invalidate when it changes, and always be able to rebuild the cache from the source of truth.
 
 ---
 
 ## 2.6 Message Queues
 
-### Why Use a Queue
+A message queue is a buffer between a producer and a consumer. The producer puts messages in the queue. The consumer takes messages out and processes them. The queue decouples them: the producer can send messages even when the consumer is busy, and the consumer can process messages at its own pace.
 
-**Without a queue:**
+The benefit of a queue is that it handles load spikes gracefully. If a hundred requests arrive at once, they go into the queue. The consumer processes them one at a time — or more, if you run multiple consumers. The producer doesn't have to wait for the consumer. It just puts messages in the queue and moves on.
 
-```text
-Client → Server → Slow operation (10s) → Response after 10s
-```
+The other benefit is reliability. If the consumer crashes, the messages stay in the queue. When the consumer restarts, it picks up where it left off. The queue is a buffer that survives failures.
 
-**With a queue:**
+Redis Lists are the simplest kind of queue. `LPUSH` adds a message to the left. `BRPOP` removes a message from the right, blocking if the queue is empty. The problem is durability: once a message is popped, it's gone. If the consumer crashes after popping but before processing, the message is lost.
 
-```text
-Client → Server → Put in queue → Immediate response "accepted"
-                          ↓
-                    Worker picks up → Processes → Result stored
-```
+Redis Streams solve this with acknowledgments. The consumer reads a message, processes it, and then sends an ACK. Until the ACK arrives, the message stays in a pending state and can be redelivered. If the consumer crashes before ACKing, the message is redelivered to another consumer. This gives at-least-once delivery: messages will be delivered, but possibly more than once.
 
-**Benefits:**
-- Decouples producer from consumer
-- Buffers load spikes
-- Enables retry and redelivery
-- Allows multiple workers
-
-### Redis Lists vs Streams
-
-| | Redis List (BLPOP) | Redis Stream (XREADGROUP) |
-|---|---|---|
-| **ACK** | No — message gone after pop | Yes — message stays until ACK |
-| **Redelivery** | Manual | Automatic via PEL |
-| **Consumer groups** | No | Yes |
-| **Use when** | Fire-and-forget | Need durability |
-
-**Your current system uses BLPOP.** For production, you need Streams — because if `rfqd` crashes after BLPOP but before processing, the command is lost.
+At-least-once delivery requires idempotent consumers. If a message can be delivered twice, the consumer must be able to handle the duplicate. This is why your `execute` command has a `command_id`. The same command can be delivered twice, but it's recognized as the same command and not executed twice.
 
 ---
 
 ## 2.7 Concurrency and Async
 
-### Concurrency vs Parallelism
+Concurrency is the ability to make progress on multiple tasks at the same time. It's not the same as parallelism, which is running multiple tasks simultaneously on multiple CPUs. Concurrency is about interleaving tasks so that none of them block the others.
 
-| | Concurrency | Parallelism |
-|---|---|---|
-| **What** | Multiple tasks in progress at the same time | Multiple tasks running at the same time |
-| **How** | Interleaved on one CPU | On multiple CPUs |
-| **Your example** | FastAPI handling many requests | Multiple `rfqd` workers |
+The most common way to achieve concurrency in Python is with async/await. An async function can pause at an `await` statement, allowing other tasks to run while it's waiting. When you `await` a network call, the function yields control. The event loop runs other tasks. When the network call completes, the function resumes.
 
-### The Async Model
+The key insight is that async doesn't make things faster. It makes waiting not block other work. If you're waiting for a bank to respond, and that wait takes 5 seconds, async lets you process other requests during those 5 seconds. Without async, you'd be blocked for the full 5 seconds, doing nothing.
 
-```python
-async def handler():
-    await slow_operation()  # yields control while waiting
-    await another_operation()  # runs while first is waiting
+Your `rfqd` main loop is not concurrent. It processes one command at a time:
+
 ```
-
-**Key insight:** `async` doesn't make things faster. It makes waiting **not block other work**.
-
-**Your `rfqd` main loop:**
-
-```python
 while True:
-    command = rfqd_receive()  # blocks
-    asyncio.run(dispatch(command))  # processes one
+    command = rfqd_receive()  # blocks until a command arrives
+    asyncio.run(dispatch(command))  # processes one command completely
+    # only after dispatch returns does the loop start again
 ```
 
-This is **not concurrent** — it's serial. One command at a time.
+This means if one command takes 5 seconds to process, all other commands wait 5 seconds. That's the bottleneck your design draft warns about.
 
-**To make it concurrent:**
-
-```python
-# Multiple workers, each with its own loop
-# OR
-# One loop that creates tasks without waiting
-```
+To make `rfqd` concurrent, you could run multiple workers, each with its own loop. Or you could restructure the loop to create tasks without waiting for each one to finish. The first is simpler — it's what your design draft recommends as the first step.
 
 ---
 
-## 2.8 Networking — DNS, TLS, HTTP
+## 2.8 Docker and Containers
 
-### DNS
+Docker packages an application and its dependencies into a single image that runs consistently anywhere. It's the most popular container technology and a foundational skill for backend engineering.
 
-**What:** Converts domain names to IP addresses.
+The core concepts are simple. An image is a read-only template that contains the code, the runtime, the dependencies, and the configuration. A container is a running instance of an image. You build an image with a Dockerfile, then run it to create a container.
 
-```text
-sandbox.brazabank.com.br → 187.32.44.10
-```
+The benefit of Docker is consistency. The image that runs on your laptop is the same image that runs on the production server. No more "works on my machine." If it works in the container, it works everywhere the container runs.
 
-**Why it matters:** DNS failures look like "the service is down" but are actually "I can't resolve the name."
+The other benefit is isolation. Each container runs in its own environment, separate from other containers. You can run multiple versions of an application side by side, or multiple applications that need conflicting dependencies.
 
-### TLS/HTTPS
+The trade-off is that Docker adds complexity. You need to build images, manage containers, handle volumes for persistent storage, and deal with networking. It's a skill that takes time to learn.
 
-**What:** Encrypts traffic between client and server.
+Your project uses Docker extensively. The `Dockerfile` builds the image. `docker-compose` orchestrates multiple containers — the API, Redis, RabbitMQ, and others. The `entrypoint_sh` script starts the services when the container boots.
 
-**Why it matters:**
-- Confidentiality — no one can read the data
-- Integrity — no one can tamper with the data
-- Authentication — you know who you're talking to
-
-**For bank APIs:** Always HTTPS. Never plain HTTP in production.
+One important lesson from your project: if you edit code on the host but don't rebuild the image, the container still runs the old code. That's because the image was built at a point in time, and the container runs that image. To pick up changes, you need to rebuild the image and restart the container — or use a bind mount that maps your local code into the container.
 
 ---
-
-## 2.9 Authentication and Authorization
-
-### Authentication vs Authorization
-
-| | Authentication | Authorization |
-|---|---|---|
-| **Question** | Who are you? | What can you do? |
-| **Example** | Login with password | Can execute trades? |
-
-### JWT (JSON Web Token)
-
-**What:** A signed token containing claims about the user.
-
-**Structure:**
-
-```text
-header.payload.signature
-```
-
-**How it works:**
-
-```text
-Client → POST /auth → Server validates → Returns JWT
-Client → GET /quote with JWT → Server validates signature → Grants access
-```
-
-**In your Braza integration:** JWT with access token (short-lived) and refresh token (long-lived). Refresh before access expires.
-
----
-
-## 2.10 Security and Secrets
-
-### The Golden Rules
-
-1. **Secrets never in code** — no passwords, tokens, or keys in source files
-2. **Secrets never in Git** — even if you delete them, they're in history
-3. **Secrets in environment variables** — or better, a secrets manager
-4. **Least privilege** — give only the access needed
-5. **Rotate secrets** — change them regularly
-
-### Your Env File Pattern
-
-```text
-Dev:     data/clearfxai_envfile (empty or sandbox creds, gitignored)
-Prod:    metaqx/deploy/clearfxai_envfile (real creds, outside repo)
-Runtime: Docker reads ./data/clearfxai_envfile
-```
-
-**This is correct.** Secrets are outside the repo. The same code path works in dev and prod.
-
----
-
-## 2.11 Docker and Containers
-
-### What Docker Does
-
-**Without Docker:**
-
-```text
-"It works on my machine" → Fails on server
-```
-
-**With Docker:**
-
-```text
-Same image → Same behavior everywhere
-```
-
-### Key Concepts
-
-| Concept | What It Is | Your Example |
-|---|---|---|
-| **Image** | Read-only template with code + dependencies | `clearfxai:0.1` |
-| **Container** | Running instance of an image | `clearfxai` container |
-| **Volume** | Persistent storage outside container | `./data:/data` |
-| **Env file** | Environment variables injected at runtime | `clearfxai_envfile` |
-
-### The Rebuild Problem
-
-If you edit code on the host but don't rebuild the image, the container still runs the old code.
-
-**In your project:**
-
-```text
-Host source: /code/sbin/rfqd.py
-Container:   /app/rfqd.py (copied at build time)
-```
-
-**Rule:** After changing code, rebuild the image before testing. Or use a bind mount for development.
-
----
-
-## 2.12 Observability — Logs, Metrics, Traces
-
-### Logs
-
-**What:** Text records of what happened.
-
-**Good log:**
-
-```text
-correlation_id=abc123 rfq_id=77001 action=execute status=DEAL latency_ms=340
-```
-
-**Bad log:**
-
-```text
-Error happened
-```
-
-**Rule:** Every log should include enough context to trace the request.
-
-### Metrics
-
-**What:** Numbers over time.
-
-| Metric | What It Tells You |
-|---|---|
-| **Latency** | How long things take |
-| **Throughput** | How many things per second |
-| **Error rate** | How often things fail |
-| **Queue depth** | How much work is waiting |
-| **Cache hit rate** | How often cache helps |
-
-### Traces
-
-**What:** The journey of one request across services.
-
-```text
-API → Redis → rfqd → libbraza → Braza API
-  2ms    1ms     5ms     340ms     100ms
-```
-
-**With tracing, you know exactly where time is spent.**
-
----
-
 # PART 2.1: MIGRATION PATTERNS — LEGACY TO NEW
 
-This is the section that directly applies to your current work. You're migrating from a legacy monolith (`rfq_api.py`) to a new architecture (`rfq_api2` + `rfqd` + libraries). This section teaches the **general patterns** for doing that safely.
+This is the section that applies most directly to the work you've been doing. You're migrating from a legacy monolith to a new architecture. This section teaches the general patterns for doing that safely, with real prose and concrete thinking.
 
 ---
 
-## 2.1.1 Why Migrations Are Hard
+## The Nature of Migration
 
-### The Problem
+Migration is not rewriting. Rewriting is throwing away the old system and building a new one from scratch. Migration is moving from the old system to the new one gradually, carefully, and safely.
 
-You have a working system. It's messy, but it works. Real users depend on it. Real money flows through it.
+The difference matters. A rewrite is dangerous because you throw away working code and replace it with unproven code. A migration is safer because the old system keeps working while the new system is built alongside it.
 
-You want to replace it. But:
+But migration is also harder. You have to maintain two systems at once. You have to ensure they produce the same results. You have to route traffic between them. You have to handle the period when both are running. And you have to roll back if something goes wrong.
 
-- You can't stop the world while you rewrite
-- You can't break the existing behavior
-- You can't lose data
-- You can't introduce bugs that cost money
-- You can't take forever
+The fundamental tension in migration is this: you want to move fast, but you can't afford to break things. The old system works. Real users depend on it. Real money flows through it. If the new system has a bug, the cost is not just a failed test — it's a wrong trade, a lost quote, a corrupted database.
 
-### The Fear
-
-> "The new system is supposed to be better, but what if it's worse?"
-
-This fear is healthy. It's what keeps you careful.
-
-### The Goal
-
-> Make the change **invisible** to the user. The backend changes. The frontend doesn't notice.
+This is why migration requires patterns. The patterns exist to manage risk. They let you make progress without betting everything on the new system working perfectly.
 
 ---
 
-## 2.1.2 The Strangler Fig Pattern
+## The Strangler Fig Pattern
 
-### What It Is
+The strangler fig is a plant that grows around a tree. It starts as a small vine, wraps around the tree, and gradually grows until it replaces the tree entirely. The tree doesn't die suddenly. It's slowly surrounded and absorbed.
 
-Named after a plant that grows around a tree and eventually replaces it.
+The strangler fig pattern applies this idea to software migration. You build the new system alongside the old one. You route traffic gradually from the old to the new. Over time, the new system takes over more and more functionality until the old system is empty and can be removed.
 
-**The idea:** Don't rewrite everything at once. Instead:
+The key principle is that you never do a big-bang cutover. You never wake up one morning and switch from old to new in one motion. Instead, you move one piece at a time. You prove each piece works before moving to the next.
 
-1. Build the new system **alongside** the old one
-2. **Route traffic gradually** from old to new
-3. **Remove old parts** as new parts prove they work
-4. Eventually the old system is empty and can be removed
+The pattern works like this. First, you identify the boundaries in the old system. What are the natural seams where you can split one part from the rest? In your legacy system, the natural seams were the HTTP layer, the workflow logic, and the institution integrations.
 
-### How It Works
+Second, you build the new system to replace one boundary. You don't try to replace everything at once. You replace one piece, prove it works, and then move to the next. Your migration started by building `rfq_api2` as a replacement for the HTTP layer.
 
-```text
-Step 1: Old system serves everything
-  Frontend → Legacy API → Database
+Third, you route traffic gradually. Start with a small percentage of users on the new system. Watch them. If they're fine, increase the percentage. If something goes wrong, route them back.
 
-Step 2: New system built alongside
-  Frontend → Legacy API → Database
-  Frontend → New API → Database (testing only)
+Fourth, you remove the old system piece by piece. As the new system proves itself, you delete the corresponding part of the old system. Eventually, there's nothing left of the old system to delete.
 
-Step 3: Route some traffic to new
-  Frontend → Router → Legacy API (90%)
-                    → New API (10%)
-
-Step 4: Increase new traffic
-  Frontend → Router → Legacy API (50%)
-                    → New API (50%)
-
-Step 5: All traffic to new
-  Frontend → Router → New API (100%)
-
-Step 6: Remove legacy
-  New API only
-```
-
-### Your Version
-
-You have exactly this:
-
-```text
-RFQ_VERSION=legacy → rfq_api.py
-RFQ_VERSION=new    → rfq_api2.py + rfqd.py
-```
-
-This toggle is a **strangler fig switch**. You can flip between old and new instantly.
+The strangler fig pattern is the safest way to migrate a system that's in production. It's not the fastest, but it's the most reliable.
 
 ---
 
-## 2.1.3 The Parallel Run (Shadow Mode)
+## The Parallel Run — Shadow Mode
 
-### What It Is
+The parallel run is the gold standard for migration safety. It means running the new system alongside the old one, with the same real traffic, and comparing the results.
 
-Run the new system **in parallel** with the old one, but only the old one's results are used.
+Here's how it works. When a request comes in, you send it to both the old system and the new system. The old system produces the real result that goes to the user. The new system produces a shadow result that goes nowhere — except into a comparison log.
 
-```text
-User request → Legacy (produces real result)
-             → New (produces shadow result)
-             → Compare
-```
+Then you compare the two results. If they match, confidence grows. If they differ, you investigate. The difference might be a bug in the new system. Or it might be an intentional improvement. Either way, you now know about it, and you can fix it before the new system goes live.
 
-If they match, confidence grows. If they differ, you investigate.
+The parallel run is powerful because it uses real traffic. You're not testing with synthetic data. You're testing with the actual requests that real users make, in the actual patterns they make them. If the new system can handle real traffic and produce the same results as the old system, you have strong evidence that it's safe to cut over.
 
-### Why It's the Gold Standard
+The cost of the parallel run is that it doubles the load. Every request is processed twice — once by the old system and once by the new. For a system under heavy load, this might not be feasible. But for most migrations, the load is manageable.
 
-- Real traffic tests the new system
-- No risk to users (old system still serves)
-- Differences are caught immediately
-- Confidence builds with every matching request
+For your RFQ migration, the parallel run would mean running both the legacy `rfq_api.py` and the new `rfq_api2.py` plus `rfqd`. Every request goes to both. The orderlogs are compared. If the records match field by field, the migration is proven safe.
 
-### For Your RFQ
-
-```text
-POST /new → Legacy writes orderlog (real)
-          → New writes orderlog (shadow)
-          → Compare both orderlogs
-```
-
-If both produce identical `rfq_status`, `rfq_px`, `rfq_spread`, etc., you have proof the migration is safe.
+This is the evidence your boss wants. He said he can't let the new system change how the database is. The parallel run is how you prove it doesn't. You run both systems side by side, compare the database writes, and show that they're identical.
 
 ---
 
-## 2.1.4 The Canary Deployment
+## The Canary Deployment
 
-### What It Is
+The canary deployment is named after the canary in the coal mine. Miners used to carry canaries underground because the birds are more sensitive to toxic gases than humans. If the canary died, the miners knew to get out.
 
-Deploy the new system to a **small subset** of users first.
+In software, the canary is a small group of users who are routed to the new system before everyone else. If the canary users are fine, you roll out to more users. If they have problems, you roll back.
 
-```text
-5% of users → New system
-95% of users → Old system
-```
+The canary deployment works like this. You deploy the new system alongside the old. You route 5% of users to the new system. You watch them carefully — error rates, latency, correctness. If they're fine for a while, you increase to 10%. Then 25%. Then 50%. Then 100%.
 
-Watch the 5%. If they're fine, increase to 10%, 25%, 50%, 100%.
+The advantage of the canary is that problems are contained. If the new system has a bug, it affects only 5% of users instead of everyone. That's a much smaller blast radius.
 
-### Why It Works
+The disadvantage is that it takes time. You can't go from 5% to 100% in an hour. You need to watch each step for a while to catch problems that only appear under sustained load or at certain times of day.
 
-- Real users test the new system
-- Problems affect only a small group
-- Rollback is instant — just route everyone back to old
-
-### For Your RFQ
-
-```text
-Broker A → New system (canary)
-Broker B → Old system
-Broker C → Old system
-```
-
-If Broker A's trades are fine for a week, add Broker B. Then C.
+For your RFQ system, the canary could be a specific broker. Route Broker A to the new system while everyone else stays on legacy. Watch Broker A's trades for a week. If they're fine, move Broker B. Then Broker C. And so on.
 
 ---
 
-## 2.1.5 The Feature Toggle
+## The Feature Toggle
 
-### What It Is
+The feature toggle is the simplest migration tool. It's a configuration flag that switches between old and new behavior at runtime.
 
-A configuration flag that switches behavior at runtime.
+Your system already has this: `RFQ_VERSION=legacy` or `RFQ_VERSION=new`. One line in the entrypoint determines which implementation serves traffic.
 
-```python
-if RFQ_VERSION == "new":
-    start_rfqd()
-    start_rfq_api2()
-else:
-    start_rfq_api()
-```
+The power of the feature toggle is that it makes rollback instant. If the new system has a problem, you flip the flag back to legacy, and the old system takes over. No redeployment needed. No rollback procedure. Just a configuration change.
 
-### Why It's Powerful
+The danger of the feature toggle is that it leaves old code lying around. After the migration is complete, you have both the legacy and the new code in your repository, with a flag to switch between them. This is technical debt. Eventually, you need to remove the legacy code and the flag, or it will confuse future developers.
 
-- Instant rollback — flip the flag
-- Gradual rollout — flip for some users
-- A/B testing — compare old vs new
-
-### Your Toggle
-
-```bash
-RFQ_VERSION="new"  # or "legacy"
-```
-
-One line. Instant switch. That's exactly what you built.
+The rule of thumb: use the feature toggle during migration, but have a plan to remove it afterward. Set a deadline for when the legacy code will be deleted.
 
 ---
 
-## 2.1.6 The Migration Steps
+## The Database Migration Problem
 
-### A Realistic Migration Plan
+The hardest part of migration is often the database. The old system writes to the database one way. The new system may write differently. But the existing data must be preserved, and the new writes must not corrupt what's already there.
 
-**Phase 1: Build alongside**
+The safest approach is to keep the database schema the same. The new system writes to the same tables, the same columns, in the same format as the old system. This is what your system does — both legacy and new write to the same orderlog.
 
-- New system built but not serving traffic
-- Unit tests pass
-- Integration tests pass
-- No user impact
+The risk is that the new system writes a slightly different value. Maybe it calculates a price differently. Maybe it sets a status in a different order. Maybe it formats a timestamp differently. Any difference, no matter how small, is a corruption of the data that the old system relied on.
 
-**Phase 2: Shadow mode**
+This is why parity testing is critical. You run the same scenario through both systems and compare the database writes field by field. Any difference is a bug. Every field must match.
 
-- New system runs in parallel
-- Results compared with legacy
-- Divergences investigated and fixed
-- Still no user impact
-
-**Phase 3: Canary**
-
-- Small subset of users/brokers routed to new
-- Monitored for errors, latency, correctness
-- Rollback ready if needed
-
-**Phase 4: Gradual rollout**
-
-- Increase new system traffic
-- Monitor at each step
-- Fix issues before increasing
-
-**Phase 5: Full cutover**
-
-- All traffic to new system
-- Legacy kept as fallback for N weeks
-
-**Phase 6: Remove legacy**
-
-- After stability confirmed
-- Delete old code
-- Celebrate
+The parity test is not optional for database migration. It's the only way to prove that the new system produces the same data as the old system. Without it, you're guessing.
 
 ---
 
-## 2.1.7 The Rollback Plan
+## The Rollback Plan
 
-### Why You Need One
+Every migration needs a rollback plan. Things go wrong. Deployments fail. Bugs appear. Traffic patterns change. You need to know how to get back to the old system if the new one has problems.
 
-**Deployments fail.** No matter how much testing, something will go wrong in production.
+The rollback plan should be simple and fast. Your feature toggle is a good rollback plan: flip `RFQ_VERSION` back to `legacy` and the old system takes over. One line. Seconds to execute.
 
-### What a Good Rollback Plan Looks Like
+But the rollback plan needs to account for the state that only the new system understands. If the new system created an RFQ in a state that the old system doesn't recognize, rolling back could leave that RFQ in limbo.
 
-```text
-1. Before deploying, know exactly how to revert
-2. Keep the old version available
-3. Practice the rollback at least once
-4. Have monitoring that detects problems
-5. Define what triggers a rollback
-```
+Your system has this exact problem with the UNKNOWN state. The new system can mark an RFQ as UNKNOWN when it's not sure whether an execution went through. The legacy system doesn't understand UNKNOWN. If you roll back to legacy while an RFQ is in UNKNOWN state, the legacy system won't know what to do with it.
 
-### Your Rollback
+This is a real problem, and your own tests flagged it: "ROLLBACK BLOCKER: UNKNOWN RFQs require manual reconciliation before rollback."
 
-```bash
-RFQ_VERSION="legacy"  # Flip the toggle
-```
+The solution is not to avoid the UNKNOWN state — it's the only honest way to handle uncertain executions. The solution is to have a procedure for reconciling UNKNOWN states before rolling back. Before flipping the toggle, check for any RFQs in UNKNOWN state. Resolve them manually — determine whether the execution actually happened and set the state accordingly. Only then roll back.
 
-One line. Instant. That's your rollback.
-
-But your own tests noted a rollback blocker:
-
-> **UNKNOWN RFQs require manual reconciliation before rollback. External execution status is uncertain and legacy cannot safely auto-retry.**
-
-This means: if the new system left an RFQ in UNKNOWN state (executed but not confirmed), rolling back to legacy is dangerous because legacy doesn't understand UNKNOWN.
-
-### The Lesson
-
-**Your rollback plan must account for states that only the new system understands.** Before flipping back to legacy, you need to resolve any UNKNOWN states.
+This is the kind of detail that separates a careful migration from a reckless one. The senior engineer thinks about what happens during rollback, not just what happens during normal operation.
 
 ---
 
-## 2.1.8 The Database Migration Problem
+## The Human Side of Migration
 
-### The Challenge
+Migration is not just a technical problem. It's a human problem. The team needs to understand what's happening, why it's happening, and what could go wrong.
 
-Old system writes to the database one way. New system may write differently.
+The most important skill is communication. Before the migration starts, tell the team what you're doing and why. During the migration, keep them updated on progress. After the migration, celebrate the success and document the lessons.
 
-**You cannot lose or corrupt existing data.**
+The second most important skill is honesty. If the migration is behind schedule, say so. If there are problems, surface them. If you're not sure something works, don't pretend it does. The team can handle bad news. They can't handle being lied to.
 
-### Strategies
+The third most important skill is patience. Migrations take time. The old system took months or years to build. The new system won't be perfect in a week. Expect setbacks. Expect bugs. Expect the unexpected.
 
-| Strategy | What It Is | When to Use |
-|---|---|---|
-| **Same schema** | New system uses the same tables/fields as old | Your case — orderlog is shared |
-| **Dual writes** | Write to both old and new schema | During transition |
-| **Read replica** | New system reads from a copy | For testing without risk |
-| **Expand/contract** | Add columns → migrate → remove old columns | Schema changes |
-
-### Your Case
-
-You share the **same orderlog**. Legacy and new write to the same place.
-
-**This is risky.** If the new system writes a slightly different value, it corrupts the data the legacy system relies on.
-
-**That's why parity tests are critical.** Every field must match.
+And the fourth skill, perhaps the most important, is humility. You don't know everything. You'll make mistakes. You'll make bad decisions. The senior engineer admits their mistakes, learns from them, and moves on. They don't defend a bad decision just because they made it.
 
 ---
 
-## 2.1.9 The Parity Test
+## The Migration Checklist
 
-### What It Is
+If you're about to migrate a system, here's what you need:
 
-Run the **same scenario** through both systems and compare the outputs.
+First, a clear understanding of what the old system does. Not what you think it does, but what it actually does. Read the code. Read the tests. Talk to the people who built it.
 
-### How to Build It
+Second, a clear understanding of what the new system should do. Same functionality? Improved? Different? Get explicit agreement from the team before building.
 
-```text
-1. Define a scenario (e.g., create RFQ with two banks)
-2. Run through legacy → capture result A
-3. Run through new → capture result B
-4. Compare A and B field by field
-5. Any difference = bug
-```
+Third, a parity testing strategy. How will you prove that the new system produces the same results as the old? What fields will you compare? What scenarios will you test?
 
-### What to Compare
+Fourth, a rollout plan. How will you route traffic from old to new? Strangler fig? Canary? Feature toggle? A combination?
 
-| Field | Why It Matters |
-|---|---|
-| `rfq_id` | Frontend needs the same ID |
-| `rfq_status` | Business state must match |
-| `rfq_px` | Price must match |
-| `rfq_px_bank` | Bank price must match |
-| `rfq_spread` | Spread must match |
-| `rfq_quote_id` | Quote reference must match |
-| HTTP status codes | Client behavior depends on them |
-| SSE event format | Frontend parses this |
+Fifth, a rollback plan. How will you get back to the old system if something goes wrong? How long will it take? What are the blockers?
 
-### Your Parity Tests
+Sixth, a monitoring plan. What will you watch during the migration? Error rates? Latency? Database consistency? How will you know if something is going wrong?
 
-You already built these:
+Seventh, a communication plan. Who needs to know about the migration? When do they need to know? What do they need to know?
 
-```text
-test_quote_parity.py     → QUOTE parity
-test_execute_cancel_parity.py → EXECUTE + CANCEL parity
-test_manual_price_parity.py   → Manual price parity
-```
-
-Each runs the same scenario through legacy and new, compares the orderlog and SSE output.
+Missing any of these is risky. Having all of them doesn't guarantee success, but it dramatically increases the odds.
 
 ---
 
-## 2.1.10 The Human Side of Migration
+# PART 2.2: DATABASE COMMUNICATION — THE COMPLETE GUIDE
 
-### Communication
+The database is the most important part of your system. If your application crashes, you restart it. If your database crashes and you don't have a backup, your data is gone forever.
 
-**Before you start:**
-
-> "We're migrating from X to Y. Here's the plan. Here's what could go wrong. Here's how we roll back."
-
-**During:**
-
-> "Phase 1 complete. Shadow mode running. 50,000 requests compared, zero divergences."
-
-**After:**
-
-> "Migration complete. Legacy kept as fallback for 2 weeks. Here's how to roll back if needed."
-
-### The Boss's Perspective
-
-Your boss's #1 concern: **"I can't let the new system change how the database is."**
-
-That's not a technical request. That's a **trust** request.
-
-He trusts the current database. He doesn't trust the new system yet.
-
-**Parity tests + shadow mode = evidence that earns trust.**
+This section goes deep into how to communicate with databases — how to design them, how to query them, how to protect them, and how to scale them.
 
 ---
 
-## 2.1.11 Summary: The Migration Checklist
+## The Relational Model
 
-```text
-✅ New system built alongside old
-✅ Unit tests pass
-✅ Integration tests pass
-✅ Parity tests pass (legacy vs new, field by field)
-✅ Shadow mode run with real traffic
-✅ Divergences investigated and fixed
-✅ Rollback plan tested
-✅ Toggle for instant switch
-✅ Canary for gradual rollout
-✅ Monitoring in place
-✅ Team knows how to roll back
-```
+The relational model is the foundation of modern databases. It was invented by Edgar Codd in 1970, and it remains the most widely used data model today.
 
-**Missing any of these = risky migration.**
+The core idea is simple: data is organized into tables. A table has rows and columns. Each row is a record. Each column is an attribute. Tables relate to each other through keys.
+
+The power of the relational model is its simplicity combined with its rigor. It's based on set theory and first-order logic, which gives it a solid mathematical foundation. Queries are written in SQL, which is declarative — you say what you want, not how to get it.
+
+A relational database enforces structure. You define a schema up front: the tables, the columns, the types, the constraints. The database rejects any data that doesn't conform to the schema. This means your data is always in a known, valid shape.
+
+This is different from NoSQL databases, which are often schemaless. In a schemaless database, you can insert any shape of data. This is flexible but dangerous — you don't know what shape your data is in until you read it.
+
+For financial systems like yours, the relational model is the right choice. Trades must be precise. Data must be consistent. The schema must be enforced. The relational model gives you these guarantees.
 
 ---
 
-# PART 2.2: DATABASE COMMUNICATION
+## Schema Design
 
-Databases are where your data lives. A senior engineer treats the database as a **critical system**, not just a place to dump data.
+Schema design is the art of organizing data into tables. It's one of the most important skills in backend engineering, and one of the most underappreciated.
 
----
+A good schema makes everything else easier. Queries are simple. Data is consistent. Performance is good. A bad schema makes everything harder. Queries are complex. Data gets inconsistent. Performance suffers.
 
-## 2.2.1 Relational Databases
+The process of schema design starts with identifying entities. An entity is a thing in the business domain that has an identity and persists over time. In your system, the entities include banks, brokers, clients, RFQs, and quotes.
 
-### What They Are
+Each entity becomes a table. The table has columns for each attribute of the entity. A bank has a name, an adapter, capabilities. An RFQ has a status, a price, a spread.
 
-Data organized in **tables** with **rows** and **columns**. Tables relate to each other through **keys**.
+The next step is defining relationships. A broker has many clients. A client has many RFQs. An RFQ has many quotes. Each relationship becomes a foreign key — a column that references the primary key of another table.
 
-**Example:**
+The third step is choosing primary keys. A primary key uniquely identifies a row. Natural keys are identifiers that exist in the business domain, like a client's CNPJ. Surrogate keys are generated identifiers, like a UUID. Natural keys are meaningful but can change. Surrogate keys are stable but meaningless. For most cases, surrogate keys are safer because they never change.
 
-```sql
--- Bank table
-bank_id | name       | adapter
----------|------------|----------
-1        | Fibra      | octax
-2        | Braza      | braza
-3        | Internal   | internal
+The fourth step is adding constraints. Constraints enforce data integrity at the database level. NOT NULL prevents missing values. UNIQUE prevents duplicates. CHECK validates values. FOREIGN KEY enforces relationships.
 
--- RFQ table
-rfq_id | bank_id | status  | price
---------|---------|---------|-------
-100     | 1       | QUOTE   | 5.10
-101     | 2       | DEAL    | 5.12
-102     | 3       | QUOTE   | 5.08
-```
-
-### Why Use Relational
-
-- Structured data with clear relationships
-- Need transactions (ACID)
-- Need complex queries (JOINs, aggregations)
-- Data integrity is critical
-
-**Your orderlog is relational in nature** — RFQs relate to banks, quotes relate to RFQs.
+The principle is simple: enforce as much as possible in the database, not in application code. Application code has bugs. The database is the last line of defense.
 
 ---
 
-## 2.2.2 Schema Design
+## Normalization and Denormalization
 
-### The Process
+Normalization is the process of organizing data to reduce redundancy. The goal is to store each fact once, not multiple times.
 
-1. **Identify entities** — Bank, RFQ, Quote, Client, Broker
-2. **Define relationships** — RFQ belongs to Broker, RFQ has many Quotes
-3. **Choose primary keys** — `rfq_id`, `bank_id`
-4. **Add foreign keys** — `rfq.bank_id` references `bank.bank_id`
-5. **Define constraints** — `rfq_status` must be one of QUOTE, DEAL, CANCELLED
+Imagine a table that stores RFQs and bank names together. Every RFQ from Fibra has "Fibra" in its row. Every RFQ from Braza has "Braza" in its row. The bank name is repeated hundreds of times.
 
-### Normalization
+If Fibra changes its name, you have to update every row that mentions Fibra. If you miss one, you have inconsistent data.
 
-**What:** Organizing data to reduce redundancy.
+Normalization fixes this by splitting the data into two tables: one for RFQs, one for banks. The RFQ table references the bank by ID. The bank name is stored once, in the bank table. Change it once, and it changes everywhere.
 
-**The rules (simplified):**
+The cost of normalization is that queries become more complex. To get an RFQ with its bank name, you need a JOIN. JOINs are slower than reading from a single table.
 
-- Each table represents one thing
-- Each row is unique (primary key)
-- No duplicate data across tables
-- Relationships via foreign keys
+Denormalization is the deliberate reversal of normalization for performance. You store redundant data to speed up reads. The cost is that the redundant data can get out of sync.
 
-**Example of normalized vs not:**
-
-```text
-❌ NOT NORMALIZED:
-rfq_id | bank_name | bank_adapter | price
-100     | Fibra     | octax        | 5.10
-101     | Fibra     | octax        | 5.12   ← "Fibra" and "octax" repeated
-
-✅ NORMALIZED:
-bank_id | bank_name | bank_adapter
-1        | Fibra     | octax
-
-rfq_id | bank_id | price
-100     | 1       | 5.10
-101     | 1       | 5.12
-```
-
-### Denormalization
-
-**What:** Intentionally adding redundancy for performance.
-
-**When:** Read-heavy workloads where JOINs are too slow.
-
-**Trade-off:** Faster reads, but risk of data inconsistency (duplicate data can diverge).
+The rule of thumb: start normalized. Denormalize only when you've measured a real performance problem and identified the specific query that's slow.
 
 ---
 
-## 2.2.3 Primary and Foreign Keys
+## Indexes
 
-### Primary Key
+An index is a data structure that speeds up reads. It's like a book index: instead of scanning every page to find a topic, you go to the index, find the page number, and turn directly to it.
 
-**What:** Uniquely identifies a row.
+Without an index, the database scans every row in the table to find a match. This is called a full table scan, and it's slow for large tables.
 
-**Rules:**
-- Never NULL
-- Never changes
-- Unique in the table
+With an index, the database can go directly to the matching rows. This is called an index seek, and it's fast regardless of table size.
 
-**Examples:** `rfq_id`, `bank_id`, `client_id`
+The cost of indexes is that they slow down writes. Every INSERT, UPDATE, or DELETE must also update the index. If you have many indexes, writes become slower.
 
-### Foreign Key
-
-**What:** References a primary key in another table. Enforces the relationship.
-
-**Example:**
-
-```sql
-CREATE TABLE rfq (
-    rfq_id TEXT PRIMARY KEY,
-    bank_id TEXT,
-    FOREIGN KEY (bank_id) REFERENCES bank(bank_id)
-);
-```
-
-If you try to insert an RFQ with a `bank_id` that doesn't exist in the bank table, the database rejects it.
+The rule of thumb: index the columns you query by. If you frequently query RFQs by `rfq_id`, index `rfq_id`. If you frequently query by `bank_id`, index `bank_id`. Don't index columns you never query by.
 
 ---
 
-## 2.2.4 Indexes
+## Transactions and ACID
 
-### What They Do
+A transaction is a group of operations that succeed together or fail together. If any operation in the transaction fails, all operations are rolled back. The database never ends up in a partially updated state.
 
-Speed up reads by creating a separate data structure that maps values to locations.
+ACID is the set of properties that transactions guarantee. Atomicity means all or nothing. Consistency means the database moves from one valid state to another. Isolation means concurrent transactions don't interfere with each other. Durability means committed data survives crashes.
 
-**Without index:** Database scans every row to find a match.
+For financial systems, transactions are essential. When you execute a trade, you need to update the RFQ status, record the execution, and update the quote. All of these must succeed together or fail together. If the RFQ status is updated but the execution isn't recorded, you have a trade that exists in one place but not the other. That's data corruption.
 
-**With index:** Database goes directly to the matching rows.
-
-### When to Index
-
-| Column | Why |
-|---|---|
-| Primary key | Always indexed automatically |
-| Foreign key | Speeds up JOINs |
-| Columns in WHERE | Speeds up filtering |
-| Columns in ORDER BY | Speeds up sorting |
-
-### The Cost
-
-Indexes slow down writes. Every INSERT or UPDATE must also update the index.
-
-**Rule:** Index for reads you do often. Don't index everything.
+Your `rfqd` uses the orderlog as its "database." When it transitions an RFQ from QUOTE to DEAL, it should do so atomically. One write, not many partial writes. The current code might not do this perfectly — the cancel flow calls institutions before persisting the state — but the principle is clear: persist atomically, or risk corruption.
 
 ---
 
-## 2.2.5 Query Planning and Optimization
+## Isolation Levels
 
-### How a Query Executes
+Isolation levels control how concurrent transactions interact. When two transactions run at the same time, what do they see?
 
-```text
-SQL query → Query planner → Execution plan → Execute → Result
-```
+The lowest isolation level is read uncommitted. A transaction can see uncommitted changes from other transactions. This is called a dirty read, and it's dangerous: you might read data that later gets rolled back.
 
-The planner decides **how** to execute the query — which indexes to use, what order to join tables.
+The next level is read committed. A transaction only sees committed changes. This prevents dirty reads, but allows non-repeatable reads: you read the same row twice and get different values because another transaction updated it in between.
 
-### The EXPLAIN Command
+The next level is repeatable read. A transaction sees the same values for the rows it has read, even if other transactions change them. This prevents non-repeatable reads but allows phantom reads: a new row appears that matches your query.
 
-```sql
-EXPLAIN SELECT * FROM rfq WHERE rfq_id = '123';
-```
+The highest level is serializable. Transactions run as if they were serialized — one at a time. This prevents all anomalies but is the slowest.
 
-Shows the execution plan. A senior engineer uses EXPLAIN to understand **why a query is slow**.
-
-### Common Optimizations
-
-| Problem | Solution |
-|---|---|
-| Full table scan | Add index on WHERE column |
-| Slow JOIN | Add index on foreign key |
-| Too many rows returned | Add LIMIT or better WHERE |
-| N+1 query problem | Use JOIN instead of loop |
+For financial systems, repeatable read or serializable is usually the right choice. A trade must see consistent data. It must not see a price that changes mid-transaction.
 
 ---
 
-## 2.2.6 Transactions and ACID
+## Locking and Concurrency Control
 
-### What a Transaction Is
+When two transactions try to modify the same data, the database must ensure they don't corrupt each other. This is concurrency control.
 
-A group of operations that **succeed together or fail together**.
+Optimistic locking assumes conflicts are rare. You read a row with a version number. You modify it. You write it back with the condition that the version hasn't changed. If someone else modified it in the meantime, the write fails and you retry.
 
-**Example:**
+Pessimistic locking assumes conflicts are common. You lock the row before reading it. Nobody else can touch it until you release the lock. This is simpler but can cause contention if many transactions want the same rows.
 
-```sql
-BEGIN;
-  UPDATE rfq SET status = 'DEAL' WHERE rfq_id = '123';
-  INSERT INTO execution (rfq_id, price) VALUES ('123', 5.10);
-COMMIT;
-```
+Your `rfqd` uses a form of pessimistic locking with Redis. Before executing an RFQ, it acquires a lock on that RFQ. Only one worker can hold the lock at a time. Other workers that try to execute the same RFQ are rejected or made to wait.
 
-If the INSERT fails, the UPDATE is rolled back. No partial state.
-
-### ACID
-
-| Property | What It Means | Your Example |
-|---|---|---|
-| **Atomicity** | All or nothing | Both writes succeed or neither |
-| **Consistency** | Valid state to valid state | RFQ can't be DEAL without execution record |
-| **Isolation** | Concurrent transactions don't interfere | Two executes on same RFQ don't corrupt |
-| **Durability** | Committed data survives crash | DEAL state survives Redis restart |
+The lock is essential for correctness. Without it, two workers could read the same RFQ as QUOTE, both execute, and both mark it DEAL. That's a double execution — exactly what your idempotency and dedup are designed to prevent.
 
 ---
 
-## 2.2.7 Isolation Levels
+## NoSQL Models
 
-### The Problem
+Relational databases are the default choice, but they're not the only choice. NoSQL databases exist for specific use cases where the relational model is not the best fit.
 
-Two transactions run at the same time. What do they see?
+Document stores like MongoDB store JSON-like documents. They're schemaless, so you can store different shapes of data in the same collection. They're good for rapid iteration and flexible data models. But they lack the strong consistency guarantees of relational databases.
 
-### The Levels
+Key-value stores like Redis store simple key-value pairs. They're extremely fast because they keep data in memory. They're good for caching, sessions, queues, and locks. But they don't support complex queries — you can only look up by key.
 
-| Level | What It Prevents | Risk |
-|---|---|---|
-| **Read Uncommitted** | Nothing | Dirty reads, all anomalies |
-| **Read Committed** | Dirty reads | Non-repeatable reads |
-| **Repeatable Read** | Dirty reads, non-repeatable reads | Phantom reads |
-| **Serializable** | Everything | Slowest |
+Wide-column stores like Cassandra are designed for massive write throughput. They're used by companies that need to write millions of records per second. But they have a restricted query model and eventual consistency.
 
-### Dirty Read
+Graph databases like Neo4j are designed for highly connected data. They're good for social networks, recommendation engines, and fraud detection. But they're overkill for most applications.
 
-Transaction A reads data that Transaction B hasn't committed yet. B rolls back. A saw data that never existed.
-
-### Non-Repeatable Read
-
-Transaction A reads a row. Transaction B updates it. A reads again — different value.
-
-### Phantom Read
-
-Transaction A reads a range. Transaction B inserts a new row in that range. A reads again — new row appears.
-
-### For Financial Systems
-
-**Use Serializable or Repeatable Read.** A trade must see consistent data, not data that changes mid-transaction.
+The rule of thumb: use a relational database unless you have a specific reason not to. And when you do use NoSQL, use it for the specific use case it's designed for — Redis for caching and queues, not as your primary data store.
 
 ---
 
-## 2.2.8 Locking and Concurrency Control
+## The CAP Theorem
 
-### Optimistic Locking
+The CAP theorem states that a distributed system can provide at most two of three guarantees: consistency, availability, and partition tolerance.
 
-**What:** Assume conflicts are rare. Check before writing.
+Consistency means every read sees the latest write. Availability means every request gets a response. Partition tolerance means the system continues to work despite network failures.
 
-```text
-1. Read row with version number
-2. Modify
-3. Write with WHERE version = old_version
-4. If no row updated, someone else changed it → retry
-```
+The theorem says you can't have all three. Network partitions are unavoidable in distributed systems, so you must choose between consistency and availability when a partition occurs.
 
-### Pessimistic Locking
+CP systems choose consistency over availability. During a network partition, they refuse to respond rather than risk returning inconsistent data. This is the right choice for financial systems — a wrong answer is worse than no answer.
 
-**What:** Lock the row before reading. Nobody else can touch it until you're done.
+AP systems choose availability over consistency. During a partition, they respond with possibly stale data. This is the right choice for social feeds and recommendation systems — a slightly stale answer is better than no answer.
 
-```sql
-SELECT * FROM rfq WHERE rfq_id = '123' FOR UPDATE;
--- Row is locked until you COMMIT or ROLLBACK
-```
-
-### Your System
-
-Your Redis per-RFQ lock is a form of **distributed pessimistic locking**. Only one worker can execute a given RFQ at a time.
+Your system is CP. When `rfqd` can't determine whether an execution happened, it marks the state UNKNOWN rather than guessing. It refuses to say "DEAL" or "FAILED" when it doesn't know. That's consistency over availability.
 
 ---
 
-## 2.2.9 Views and Materialized Views
+## Data Integrity
 
-### View
+Data integrity means the data is correct, consistent, and trustworthy. It's the most important property of a database, and it's under constant threat.
 
-**What:** A saved query. Looks like a table but computes on the fly.
+Integrity is protected by constraints. NOT NULL prevents missing values. UNIQUE prevents duplicates. CHECK prevents invalid values. FOREIGN KEY prevents orphaned rows. The database enforces these constraints, so application bugs can't corrupt the data.
 
-```sql
-CREATE VIEW dealt_rfqs AS
-SELECT * FROM rfq WHERE rfq_status = 'DEAL';
-```
+Integrity is also protected by transactions. A transaction ensures that a group of operations succeed together or fail together. There's never a moment where half the operations have been applied and half haven't.
 
-Every time you query `dealt_rfqs`, it runs the underlying query.
+And integrity is protected by backups. If something goes catastrophically wrong — a disk failure, a bug that corrupts data, a malicious actor — you can restore from a backup. The backup is your insurance.
 
-### Materialized View
-
-**What:** A saved query result, stored physically. Faster, but can be stale.
-
-```sql
-CREATE MATERIALIZED VIEW dealt_rfqs AS
-SELECT * FROM rfq WHERE rfq_status = 'DEAL';
-```
-
-The result is computed once and stored. You refresh it when needed.
+The principle: protect integrity at every layer. Constraints in the database. Transactions in the application. Backups in the operations. Defense in depth.
 
 ---
 
-## 2.2.10 Stored Procedures and Triggers
+## Performance Tuning
 
-### Stored Procedure
+Performance tuning is the art of making queries faster. It's a skill that combines measurement, analysis, and iteration.
 
-**What:** SQL code saved in the database. Called like a function.
+The first step is measurement. Find the slow queries. Use logging, monitoring, and profiling to identify which queries are taking too long. Don't guess — measure.
 
-**When to use:** Complex operations that must happen atomically.
+The second step is analysis. Use EXPLAIN to understand how the database is executing the query. Is it using an index or doing a full table scan? Is it doing a nested loop join or a hash join? Where is the time being spent?
 
-### Trigger
+The third step is fixing. Add an index. Rewrite the query. Denormalize. Partition. Whatever the analysis suggests.
 
-**What:** Code that runs automatically when data changes.
+The fourth step is measuring again. Confirm that the fix actually helped. Sometimes a change that seems like it should help doesn't, and you need to try something else.
 
-**Example:**
-
-```sql
-CREATE TRIGGER on_rfq_deal
-AFTER UPDATE ON rfq
-FOR EACH ROW
-WHEN (NEW.rfq_status = 'DEAL')
-EXECUTE FUNCTION publish_deal_event();
-```
-
-**Caution:** Triggers are hidden logic. Hard to debug. Use sparingly.
+The most common performance problems are missing indexes, N+1 query patterns, fetching too much data, and lock contention. Each has a known fix. The skill is in identifying which problem you have and applying the right fix.
 
 ---
 
-## 2.2.11 Migrations
+## High Availability and Disaster Recovery
 
-### What They Are
+High availability means the database keeps working when a component fails. Disaster recovery means you can recover after a catastrophic failure.
 
-Versioned changes to the database schema.
+High availability is achieved through redundancy. Run multiple replicas of the database. If the primary fails, promote a replica. The system keeps working because there's always a backup.
 
-```text
-migration_001: create bank table
-migration_002: add adapter column to bank
-migration_003: create rfq table
-migration_004: add braza_order_id to rfq
-```
+Disaster recovery is achieved through backups and replication. Regular backups let you restore data if it's lost. Replication to a different location lets you recover if the primary location is destroyed.
 
-### Rules
+The key metrics are RPO and RTO. RPO — recovery point objective — is how much data you can afford to lose. If your RPO is five minutes, you need backups or replication that are no more than five minutes behind. RTO — recovery time objective — is how long recovery can take. If your RTO is one hour, you need to be able to restore within an hour.
 
-- Each migration is small and reversible
-- Migrations are versioned and applied in order
-- Never modify a migration that's already applied
-- Always test migrations on a copy first
+For financial systems, RPO and RTO should be low. You can't afford to lose trades. You can't afford to be down for hours.
 
 ---
 
-## 2.2.12 Backups and Restore
+## Choosing the Right Database
 
-### Why
+The default choice is a relational database — PostgreSQL in most cases. It handles 90% of use cases well. It's mature, well-documented, and has strong consistency guarantees.
 
-**Databases fail.** Disks die. Humans make mistakes. You need a way to recover.
+Choose NoSQL only when you have a specific reason. Redis for caching, queues, and locks. MongoDB for flexible schemas. Cassandra for massive write throughput. Neo4j for graph data.
 
-### Strategies
+The mistake is choosing NoSQL because it's fashionable. Choose it because it solves a specific problem that a relational database can't solve well.
 
-| Strategy | What It Is | Frequency |
-|---|---|---|
-| **Full backup** | Complete copy of database | Daily |
-| **Incremental backup** | Changes since last backup | Hourly |
-| **Point-in-time recovery** | Replay transactions to a moment | Continuous |
-
-### The Restore Test
-
-**A backup that's never tested is not a backup.**
-
-Regularly restore from backup to a test database. Prove you can recover.
+For your system, the orderlog is the source of truth, and it behaves like a relational database. Redis is the cache and message bus. The two complement each other: Redis for speed, orderlog for durability and consistency. That's the right architecture.
 
 ---
 
-## 2.2.13 Replication
+# PART 3: MAKEFILES — THE COMPLETE EXPLANATION
 
-### What It Is
+A Makefile is a file that automates repetitive commands. Instead of typing a long Docker command every time, you type `make run`. Instead of remembering the exact syntax for building an image, you type `make build`.
 
-Copy data from one database (primary) to others (replicas).
+But a Makefile is more than just shortcuts. It's a way of capturing your project's workflows in code. When you write a Makefile, you're documenting how to build, run, test, and deploy your application. A new developer can read the Makefile and understand the project's commands without asking anyone.
 
-```text
-Primary (writes) → Replica 1 (reads)
-                 → Replica 2 (reads)
-```
-
-### Why
-
-- **Read scalability** — spread reads across replicas
-- **High availability** — if primary dies, promote replica
-- **Disaster recovery** — replicas in different locations
-
-### The Trade-off
-
-Replicas may be **slightly behind** the primary. Read from replica = possibly stale data.
+This part explains Makefiles from the ground up. What they are, how they work, and how to use them effectively.
 
 ---
 
-## 2.2.14 Partitioning and Sharding
+## What a Makefile Actually Is
 
-### Partitioning
+A Makefile is a file named `Makefile` that contains rules. Each rule has a target, optional dependencies, and commands.
 
-**What:** Split a large table into smaller pieces **within the same database**.
+The target is the name of the rule. It's what you type after `make`. When you run `make build`, you're asking make to execute the `build` target.
 
-```sql
--- Partition rfq by date
-rfq_2026_01, rfq_2026_02, rfq_2026_03, ...
-```
+Dependencies are other targets that must run before this one. When you run `make run` and the `run` target depends on the `build` target, make runs `build` first, then `run`.
 
-### Sharding
+Commands are the shell commands that make executes. They're indented with a tab, not spaces. This is a historical quirk of make — the tab is required, and it's one of the most common sources of Makefile errors.
 
-**What:** Split data across **multiple databases**.
-
-```text
-Shard 1: RFQs with ID starting with 0-4
-Shard 2: RFQs with ID starting with 5-9
-```
-
-### When to Use
-
-- Single database too large
-- Write load too high for one machine
-- Data must be isolated by region or customer
-
-### The Cost
-
-Queries across shards are hard. JOINs across shards are impossible. Consistency across shards is complex.
-
----
-
-## 2.2.15 Connection Pooling
-
-### The Problem
-
-Opening a database connection is expensive. Doing it for every request wastes time.
-
-### The Solution
-
-Keep a pool of open connections. Reuse them.
-
-```text
-Pool (10 connections)
-  ↓
-Request → Borrow connection → Query → Return connection
-```
-
-### Rules
-
-- Pool size should match your workload
-- Too small = requests wait for connections
-- Too large = database overwhelmed
-
----
-
-## 2.2.16 NoSQL Models
-
-### Document Store (MongoDB)
-
-**What:** Store JSON-like documents.
-
-**When to use:** Flexible schema, nested data, rapid iteration.
-
-**Trade-off:** No JOINs, weaker consistency.
-
-### Key-Value Store (Redis)
-
-**What:** Simple key → value. Very fast.
-
-**When to use:** Cache, sessions, locks, queues.
-
-**Your Redis is a key-value store.**
-
-### Wide Column (Cassandra)
-
-**What:** Rows with many columns, grouped by partition key.
-
-**When to use:** Massive write throughput, known query patterns.
-
-### Graph (Neo4j)
-
-**What:** Nodes and edges. Great for relationships.
-
-**When to use:** Social networks, recommendation engines.
-
----
-
-## 2.2.17 CAP Theorem
-
-### The Three Properties
-
-| Property | What It Means |
-|---|---|
-| **Consistency** | Every read sees the latest write |
-| **Availability** | Every request gets a response |
-| **Partition Tolerance** | System works despite network failures |
-
-### The Rule
-
-**You can only have two of the three.**
-
-Network partitions are unavoidable in distributed systems, so you must choose:
-
-| Choice | What You Sacrifice | Example |
-|---|---|---|
-| **CP** | Availability | Bank transactions — consistency matters more |
-| **AP** | Consistency | Social feeds — availability matters more |
-
-### For Your System
-
-**Financial trades = CP.** Consistency is non-negotiable. If the system can't guarantee consistency, it should say "unavailable" rather than show wrong data.
-
----
-
-## 2.2.18 Data Integrity
-
-### Constraints
-
-| Constraint | What It Prevents |
-|---|---|
-| **NOT NULL** | Missing values |
-| **UNIQUE** | Duplicate values |
-| **CHECK** | Invalid values (e.g., negative price) |
-| **FOREIGN KEY** | Orphaned rows |
-
-### The Rule
-
-**Enforce integrity in the database, not just in application code.** Application code has bugs. Database constraints are the last line of defense.
-
----
-
-## 2.2.19 Performance Tuning
-
-### The Approach
-
-1. **Measure** — find the slow queries
-2. **Analyze** — use EXPLAIN to understand why
-3. **Fix** — add index, rewrite query, denormalize
-4. **Measure again** — confirm improvement
-
-### Common Causes of Slow Queries
-
-| Problem | Fix |
-|---|---|
-| Full table scan | Add index |
-| N+1 queries | Use JOIN |
-| Too much data returned | Add WHERE or LIMIT |
-| Lock contention | Reduce transaction time |
-| No connection pooling | Add pool |
-
----
-
-## 2.2.20 High Availability and Disaster Recovery
-
-### High Availability (HA)
-
-**What:** System keeps working when a component fails.
-
-**How:** Redundancy — multiple replicas, automatic failover.
-
-### Disaster Recovery (DR)
-
-**What:** System recovers after a catastrophic failure.
-
-**How:** Backups, replicas in different locations, tested restore procedures.
-
-### RPO and RTO
-
-| Metric | What It Means |
-|---|---|
-| **RPO** (Recovery Point Objective) | How much data you can afford to lose (e.g., 5 minutes) |
-| **RTO** (Recovery Time Objective) | How long recovery can take (e.g., 1 hour) |
-
-**For financial systems:** Low RPO (lose almost no data) and low RTO (recover quickly).
-
----
-
-## 2.2.21 Data Lifecycle and Retention
-
-### The Questions
-
-- How long do you keep data?
-- When do you archive it?
-- When do you delete it?
-- Who can access old data?
-
-### For Your System
-
-RFQs and trades likely have **regulatory retention requirements**. You can't just delete a trade after 30 days. Check what the law requires.
-
----
-
-## 2.2.22 Choosing the Right Database
-
-### The Decision Framework
-
-| Question | If Yes | If No |
-|---|---|---|
-| Is data highly structured? | Relational | NoSQL |
-| Do you need transactions? | Relational | NoSQL possible |
-| Are relationships important? | Relational | NoSQL possible |
-| Is read latency critical? | Cache + Relational | — |
-| Is write throughput massive? | Cassandra or similar | Relational |
-| Is data schema flexible? | Document store | Relational |
-
-### The Default Answer
-
-**Start with a relational database** (PostgreSQL). It handles 90% of cases well.
-
-Only choose NoSQL when you have a **specific reason**:
-
-- Redis: cache, queues, locks
-- MongoDB: flexible schema documents
-- Cassandra: massive write throughput
-
----
-
-# PART 3: MAKEFILES
-
-Makefiles automate repetitive commands. Instead of typing a long docker command every time, you type `make run`.
-
----
-
-## 3.1 What a Makefile Is
-
-A file named `Makefile` containing **targets** (commands) and their **dependencies**.
+Here's the simplest possible Makefile:
 
 ```makefile
-target: dependencies
-	command
-	another command
+hello:
+	echo "Hello, world"
 ```
 
-**Example:**
+When you run `make hello`, make executes `echo "Hello, world"`.
+
+Here's a Makefile with a dependency:
 
 ```makefile
-run:
-	docker-compose up -d
-
 build:
 	docker build -t myapp:0.1 .
+
+run: build
+	docker run myapp:0.1
 ```
 
-Run with:
+When you run `make run`, make first runs `build` (because `run` depends on it), then runs the `run` command.
 
-```bash
-make run
-make build
-```
+The power of dependencies is that they chain. You can define a high-level target like `make deploy` that depends on `test`, which depends on `build`, which depends on nothing. Running `make deploy` runs the whole chain in order.
 
 ---
 
-## 3.2 Variables
+## Variables in Makefiles
+
+Variables make your Makefile maintainable. Instead of repeating a version number or a command in every rule, you define it once as a variable and reference it everywhere.
 
 ```makefile
 RELEASENO=0.1
@@ -2131,11 +1085,22 @@ DOCKERCOMPOSECMD=docker-compose
 
 build:
 	docker build -t clearfxai:${RELEASENO} -f Dockerfile .
+
+run:
+	${DOCKERCOMPOSECMD} -f Dockercompose up -d
 ```
 
-`${RELEASENO}` is replaced with `0.1` when the command runs.
+When make runs `build`, it replaces `${RELEASENO}` with `0.1`. When it runs `run`, it replaces `${DOCKERCOMPOSECMD}` with `docker-compose`.
 
-### Conditional Variables
+Variables are especially useful for values that change over time. The version number, for example. When you bump from 0.1 to 0.2, you change one line instead of every rule that references the version.
+
+Variables can also be set from the environment. If you run `make build RELEASENO=0.2`, the command-line value overrides the Makefile value. This lets you customize builds without editing the file.
+
+---
+
+## Conditional Variables
+
+Makefiles can have conditionals. The most common use is to handle platform differences.
 
 ```makefile
 DOCKERCOMPOSECMD=docker-compose
@@ -2144,187 +1109,274 @@ DOCKERCOMPOSECMD=docker compose
 endif
 ```
 
-On macOS, `docker compose` (space, not hyphen). On Linux, `docker-compose`.
+This says: by default, use `docker-compose`. But if the operating system is Darwin (macOS), use `docker compose` instead — note the space instead of the hyphen.
+
+The `$(shell uname -s)` runs the `uname -s` command and returns the result. On macOS, it returns "Darwin". On Linux, it returns "Linux". The `ifeq` compares the result with "Darwin" and sets the variable accordingly.
+
+This is a common pattern because Docker's command-line interface changed. Older versions use `docker-compose` with a hyphen. Newer versions use `docker compose` with a space. The conditional handles both.
 
 ---
 
-## 3.3 Targets
+## Phony Targets
 
-### Simple Target
+By default, make treats targets as files. If you have a target named `clean`, make checks whether a file named `clean` exists. If it does, and it's newer than the target's dependencies, make skips the target.
 
-```makefile
-build:
-	docker build -t clearfxai:0.1 .
-```
-
-### Target with Dependencies
+This is almost never what you want. Your targets are commands, not files. To tell make this, you declare them as phony:
 
 ```makefile
-run: build
-	docker-compose up -d
+.PHONY: build run test clean
 ```
 
-Running `make run` first runs `make build`, then runs the command.
+This tells make: these are commands, not files. Always run them when asked, regardless of whether a file with that name exists.
 
-### Phony Targets
+Without the `.PHONY` declaration, you can get subtle bugs. If you have a file named `test` in your directory, `make test` will do nothing. That's confusing and hard to debug.
 
-```makefile
-.PHONY: build run test
-```
-
-Tells make these aren't real files — they're commands.
+Always declare your targets as phony. It's a small line that prevents a whole class of bugs.
 
 ---
 
-## 3.4 Your Makefile Explained
+## The Touch Trick
+
+Your Makefile has an interesting pattern:
 
 ```makefile
-# Variable definitions
-DOCKERCOMPOSECMD=docker-compose
-
-# Conditional: macOS uses "docker compose" with a space
-ifeq ($(shell uname -s), Darwin)
-DOCKERCOMPOSECMD=docker compose
-endif
-
-# Version number
-RELEASENO=0.1
-
-# Build the image
-build:
-	docker build \
-		-t clearfxai:${RELEASENO} \
-		-f ${PWD}/Dockerfile .
-
-# Run with Docker Compose
 run:
 	bash -xc "touch ${PWD}/data/quotebot_envfile; \
 	touch ${PWD}/data/clearfxai_envfile; \
 	[ -f ${PWD}/data/voice_envfile ] && source ${PWD}/data/voice_envfile; \
 	${DOCKERCOMPOSECMD} \
 		-f Dockercompose up -d"
+```
 
-# Build and run
-brplatform: stop build run
+The `touch` command creates an empty file if it doesn't exist. Why would you want to create empty files?
 
-# Stop and build and run
-brplatform: stop build run
+Because Docker Compose fails if an `env_file` doesn't exist. If you declare `env_file: ./data/clearfxai_envfile` in your Docker Compose file, and that file doesn't exist, Docker Compose refuses to start.
 
-# Bash into the running container
-bash:
-	docker exec -it clearfxai_clearfxai_1 bash -l
+The `touch` ensures the file always exists, even for local development where you don't have real credentials. The file is empty, but it exists, so Docker Compose is happy.
 
-# Stop everything
+This is a small but important pattern. It lets the same Docker Compose configuration work in development (with empty env files) and production (with real env files).
+
+---
+
+## The Dash Prefix
+
+In shell commands, a dash before a command means "don't fail if this command fails."
+
+```makefile
 stop:
 	-bash -xc "source ${PWD}/data/voice_envfile && \
 	${DOCKERCOMPOSECMD} -f Dockercompose down"
 ```
 
+The dash before `bash` tells make: if this command fails, don't stop. Keep going.
+
+This is useful for cleanup commands. If you're stopping Docker containers and there are no containers running, the `docker-compose down` command might fail. The dash prevents that failure from stopping your Makefile.
+
+The principle: use the dash prefix for commands that are allowed to fail. Don't use it for commands where failure should stop the build.
+
 ---
 
-## 3.5 The `touch` Trick
+## Chaining Targets
+
+The real power of Makefiles comes from chaining targets into workflows.
+
+Your Makefile has this:
 
 ```makefile
-touch ${PWD}/data/clearfxai_envfile
+brplatform: stop build run
 ```
 
-Creates an empty file if it doesn't exist. Why?
+This is a high-level target that chains three others. Running `make brplatform` runs `stop` first, then `build`, then `run`. It's a complete workflow: stop the old containers, build a new image, start the new containers.
 
-**Because Docker Compose fails if the env_file doesn't exist.** The `touch` ensures it always exists, even for local dev without real credentials.
+You can chain as many targets as you need. A deployment target might chain `test`, `build`, `push`, and `deploy`. A development target might chain `build` and `run`.
+
+The advantage of chaining is that you capture a workflow in one command. Instead of remembering four commands and their order, you remember one: `make brplatform`.
+
+The disadvantage is that you lose flexibility. If you only want to rebuild without stopping, you can't use `brplatform` — you have to run the individual targets.
+
+The rule of thumb: create high-level targets for common workflows, but keep the individual targets for when you need fine-grained control.
 
 ---
 
-## 3.6 The `-` Prefix
+## Your Makefile Explained
+
+Let's walk through the key parts of your Makefile.
+
+The variable definitions set up the version number and the Docker Compose command:
 
 ```makefile
--bash -xc "source ..."
+RELEASENO=0.1
+DOCKERCOMPOSECMD=docker-compose
 ```
 
-The `-` means **"don't fail if this command fails."** Useful for cleanup commands that might fail if nothing is running.
+The conditional handles macOS:
 
----
-
-## 3.7 The `&&` Chain
-
-```bash
-[ -f file ] && source file
+```makefile
+ifeq ($(shell uname -s), Darwin)
+DOCKERCOMPOSECMD=docker compose
+endif
 ```
 
-Means: **"If file exists, then source it."** If the file doesn't exist, the whole command still succeeds.
+The build target builds the Docker image:
+
+```makefile
+build:
+	docker build \
+		-t clearfxai:${RELEASENO} \
+		-f ${PWD}/Dockerfile .
+```
+
+The `-t` flag tags the image with the version number. The `-f` flag specifies the Dockerfile. The `.` at the end is the build context — the directory that Docker uses as the root for the build.
+
+The run target starts Docker Compose:
+
+```makefile
+run:
+	bash -xc "touch ${PWD}/data/quotebot_envfile; \
+	touch ${PWD}/data/clearfxai_envfile; \
+	[ -f ${PWD}/data/voice_envfile ] && source ${PWD}/data/voice_envfile; \
+	${DOCKERCOMPOSECMD} \
+		-f Dockercompose up -d"
+```
+
+The `touch` commands create the env files. The conditional sources the voice env file if it exists. Then Docker Compose starts in detached mode (`-d`).
+
+The brplatform target chains the workflow:
+
+```makefile
+brplatform: stop build run
+```
+
+Stop, build, run. The complete cycle.
+
+The bash target opens a shell in the running container:
+
+```makefile
+bash:
+	docker exec -it clearfxai_clearfxai_1 bash -l
+```
+
+The `-it` flags make the shell interactive. The `-l` flag makes it a login shell.
+
+The stop target stops everything:
+
+```makefile
+stop:
+	-bash -xc "source ${PWD}/data/voice_envfile && \
+	${DOCKERCOMPOSECMD} -f Dockercompose down"
+```
+
+The dash prefix means "don't fail if this fails." The `down` command stops and removes the containers.
 
 ---
 
-## 3.8 Common Make Commands
+## Best Practices
 
-| Command | What It Does |
-|---|---|
-| `make build` | Build the image |
-| `make run` | Start containers |
-| `make stop` | Stop containers |
-| `make brplatform` | Stop, build, run |
-| `make bash` | Shell into container |
+The first best practice is to use variables for anything that changes. Version numbers, commands, paths, flags. Define them once, reference them everywhere.
 
----
+The second best practice is to declare phony targets. It's one line that prevents a whole class of confusing bugs.
 
-## 3.9 Best Practices
+The third best practice is to chain common workflows into high-level targets. `make brplatform` is easier to remember than three separate commands.
 
-1. **Use variables** for versions, paths, commands
-2. **Phony targets** — always declare `.PHONY`
-3. **Dependencies** — make targets depend on what they need
-4. **Don't fail on cleanup** — use `-` for optional commands
-5. **Keep it simple** — if a target is too complex, it belongs in a script
+The fourth best practice is to keep targets simple. If a target is more than a few lines, it probably belongs in a shell script, not a Makefile.
+
+The fifth best practice is to document your targets. A new developer should be able to read the Makefile and understand what each target does without asking.
 
 ---
 
-# PART 4: SHELL SCRIPTS (`.sh` FILES)
+# PART 4: SHELL SCRIPTS — THE COMPLETE EXPLANATION
 
-Shell scripts are text files containing commands the shell executes line by line.
+A shell script is a file containing commands that the shell executes line by line. It's the glue that holds systems together — the automation that starts services, processes data, deploys code, and handles failures.
+
+Your `entrypoint_sh` is a shell script. It starts Redis, starts the API, starts the daemon, and keeps the container alive. Understanding shell scripts is essential for backend engineering because they're everywhere: CI/CD pipelines, Docker entrypoints, deployment scripts, cron jobs.
+
+This part explains shell scripts from the ground up.
 
 ---
 
-## 4.1 The Shebang
+## The Shebang
+
+Every shell script starts with a shebang. It's the first line of the file, and it tells the system which interpreter to use.
 
 ```bash
 #!/usr/bin/env bash
 ```
 
-The first line. Tells the system **which interpreter to use**.
+This says: use the `bash` interpreter found in the PATH.
 
-- `#!/bin/bash` — use bash specifically
-- `#!/usr/bin/env bash` — find bash in PATH (more portable)
+The alternative is to specify the interpreter directly:
+
+```bash
+#!/bin/bash
+```
+
+This says: use the `bash` interpreter at `/bin/bash`.
+
+The difference is portability. `#!/usr/bin/env bash` works even if bash is installed in a non-standard location, because `env` searches the PATH. `#!/bin/bash` assumes bash is at `/bin/bash`, which is true on most systems but not all.
+
+The shebang is followed by the script body. Each line is a command, executed in order.
 
 ---
 
-## 4.2 Variables
+## Variables
+
+Variables store values for later use.
 
 ```bash
 NAME="Isabel"
 echo "Hello, $NAME"
-echo "Hello, ${NAME}"
 ```
 
-Both print: `Hello, Isabel`
+This prints `Hello, Isabel`.
 
-### Environment Variables
+Variables can hold strings, numbers, paths, commands — anything. The shell doesn't have types. Everything is a string.
+
+To access a variable, prefix it with `$`. To assign a variable, use `=` with no spaces around it.
+
+```bash
+NAME="Isabel"   # correct
+NAME = "Isabel" # wrong — spaces around = cause errors
+```
+
+Curly braces are optional but recommended when the variable is adjacent to other text:
+
+```bash
+echo "${NAME} is here"   # correct
+echo "$NAME is here"     # also correct, but ambiguous in some cases
+echo "$NAMEis here"      # wrong — shell thinks NAMEis is the variable name
+```
+
+The rule: use curly braces when the variable is not clearly delimited.
+
+---
+
+## Environment Variables
+
+Environment variables are variables that are passed to child processes. When you run a command from a shell, that command inherits the shell's environment variables.
+
+To set an environment variable:
 
 ```bash
 export RFQ_VERSION="new"
-echo $RFQ_VERSION
 ```
 
-`export` makes the variable available to child processes.
+The `export` keyword makes the variable available to child processes. Without `export`, the variable is only available in the current shell.
 
-### Default Values
+To use an environment variable with a default:
 
 ```bash
 export RABBIT_HOST="${RABBIT_HOST:-mqbus}"
 ```
 
-Means: if `RABBIT_HOST` is already set, use it. Otherwise, use `mqbus`.
+This says: if `RABBIT_HOST` is already set, use it. Otherwise, use `mqbus`. The `:-` is the default value operator.
+
+This pattern is common in Docker entrypoints and deployment scripts. It lets you set defaults while allowing overrides from the environment.
 
 ---
 
-## 4.3 Conditionals
+## Conditionals
+
+Conditionals let the script make decisions.
 
 ```bash
 if [ "$RFQ_VERSION" = "new" ]; then
@@ -2334,20 +1386,40 @@ else
 fi
 ```
 
-### File Tests
+The `[ "$RFQ_VERSION" = "new" ]` is a test. If the variable equals "new", the first branch runs. Otherwise, the second branch runs.
+
+The square brackets are actually a command called `test`. They're not part of the shell syntax — they're a command that returns success or failure based on the condition.
+
+There are several types of tests. String tests compare strings. Numeric tests compare numbers. File tests check file properties.
+
+String tests:
 
 ```bash
-[ -f /data/clearfxai_envfile ]   # true if file exists
-[ -d /data ]                    # true if directory exists
-[ ! -f /data/file ]             # true if file does NOT exist
+[ "$a" = "$b" ]    # true if a equals b
+[ "$a" != "$b" ]   # true if a does not equal b
+[ -z "$a" ]        # true if a is empty
+[ -n "$a" ]        # true if a is not empty
 ```
+
+File tests:
+
+```bash
+[ -f /data/file ]  # true if file exists and is a regular file
+[ -d /data ]       # true if directory exists
+[ ! -f /data/file ] # true if file does NOT exist
+```
+
+The `!` negates the test.
 
 ---
 
-## 4.4 Loops
+## Loops
+
+Loops let the script repeat commands.
+
+The most common loop in shell scripts is the `while` loop:
 
 ```bash
-# While loop with sleep
 while true; do
     python3 -m rfqd
     echo "rfqd stopped; restarting in 2 seconds"
@@ -2355,11 +1427,25 @@ while true; do
 done
 ```
 
-This restarts `rfqd` forever if it crashes.
+This runs `python3 -m rfqd`, waits for it to exit, prints a message, waits 2 seconds, and repeats. It's an infinite loop that restarts the daemon if it crashes.
+
+The `while true` means "loop forever." The only way to exit is with a `break` statement or by killing the process.
+
+`for` loops iterate over a list:
+
+```bash
+for bank in "fibra" "braza" "internal"; do
+    echo "Processing $bank"
+done
+```
+
+This prints `Processing fibra`, `Processing braza`, `Processing internal`.
 
 ---
 
-## 4.5 Functions
+## Functions
+
+Functions group commands into reusable units.
 
 ```bash
 start_rfqd()
@@ -2371,56 +1457,97 @@ start_rfqd()
         sleep 2
     done
 }
+```
 
-# Call it
+This defines a function named `start_rfqd`. To call it:
+
+```bash
 start_rfqd
 ```
 
+Functions are useful for organizing scripts. Instead of one long sequence of commands, you define functions for each logical step and call them in order.
+
+Your `entrypoint_sh` uses functions extensively. It defines `start_sandbox`, `start_mockpricer`, `start_tls`, `start_auth`, and many others. Each function starts one service. Then the script calls them all in the right order.
+
 ---
 
-## 4.6 Background Processes
+## Background Processes
+
+By default, commands run in the foreground. The script waits for each command to finish before running the next.
+
+To run a command in the background, append `&`:
 
 ```bash
 start_rfqd &
 start_rfqapi &
 ```
 
-The `&` runs the command in the background, so the script continues.
+This starts both functions in the background. The script continues immediately without waiting for them to finish.
+
+Background processes are essential for starting multiple services in a container. Redis, the API, the daemon — they all need to run at the same time. If they ran in the foreground, the first one would block the others.
+
+Your `entrypoint_sh` starts many services in the background: Redis, the sandbox, TLS, auth, entity, and others. Each gets `&` to run in the background. The script then continues to the next service.
 
 ---
 
-## 4.7 Redirects
+## Redirects
+
+Redirects control where output goes.
+
+Standard output (stdout) is where normal output goes. Standard error (stderr) is where error messages go. By default, both go to the terminal.
+
+To redirect stdout to a file:
 
 ```bash
-# Redirect stdout to a file
-python3 -m rfqd > /data/rfqd.log
-
-# Redirect stderr to the same file
-python3 -m rfqd > /data/rfqd.log 2>&1
-
-# Redirect stdout to a file, stderr to terminal
 python3 -m rfqd > /data/rfqd.log
 ```
 
----
+This sends the normal output to `/data/rfqd.log` instead of the terminal.
 
-## 4.8 Your Entrypoint Explained
+To redirect stderr to the same file:
 
 ```bash
-#!/usr/bin/env bash
+python3 -m rfqd > /data/rfqd.log 2>&1
+```
 
-# Locale settings
+The `2>&1` means "send stderr (2) to wherever stdout (1) is going." Now both normal output and errors go to the file.
+
+To redirect stderr specifically:
+
+```bash
+echo "error" >&2
+```
+
+This sends the message to stderr specifically. It's useful for error messages that should appear on the terminal even when stdout is redirected.
+
+---
+
+## Your Entrypoint Explained
+
+Your `entrypoint_sh` is the script that runs when the container starts. Let's walk through it.
+
+The first lines set up the environment:
+
+```bash
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
-
-# RabbitMQ host with default
 export RABBIT_HOST="${RABBIT_HOST:-mqbus}"
+```
 
-# Select RFQ version
+The locale settings ensure consistent character encoding. The RabbitMQ host is set with a default.
+
+The next lines select the RFQ version:
+
+```bash
 RFQ_VERSION="new"
 export RFQ_VERSION
+```
 
-# Validate
+This is the toggle between legacy and new. Change this line to switch.
+
+The validation ensures the version is valid:
+
+```bash
 case "$RFQ_VERSION" in
     legacy|new) ;;
     *)
@@ -2428,108 +1555,124 @@ case "$RFQ_VERSION" in
         exit 1
         ;;
 esac
+```
 
-# Function: start rfqd
-start_rfqd()
-{
-    cd /app
-    while true; do
-        python3 -m rfqd
-        echo "rfqd stopped; restarting in 2 seconds" >&2
-        sleep 2
-    done
-}
+If the version is "legacy" or "new", the script continues. Otherwise, it prints an error and exits.
 
-# Start Redis
+The script defines functions for each service. Then it starts Redis:
+
+```bash
 redis-server /etc/redis.conf &
 sleep 2
+```
 
-# Start rfqd in background if new
+Redis starts in the background. The script waits 2 seconds for it to initialize.
+
+Then it starts the daemon conditionally:
+
+```bash
 if [ "$RFQ_VERSION" = "new" ]; then
     start_rfqd >/data/rfqd.log 2>&1 &
 fi
+```
 
-# Start rfq_api
+Only if the version is "new" does the daemon start. The output goes to a log file.
+
+Then it starts the API:
+
+```bash
 start_rfqapi &
+```
 
-# Keep the container alive
+The API starts in the background.
+
+Then it starts all the other services. And finally, it keeps the container alive:
+
+```bash
 while sleep 10; do
     tail -f /var/log/nginx/access.log
 done
 ```
 
----
-
-## 4.9 Best Practices
-
-| Practice | Why |
-|---|---|
-| `set -u` | Fail on undefined variables |
-| `set -e` | Fail on command errors (use carefully) |
-| Quote variables | `"$VAR"` not `$VAR` — handles spaces |
-| Use functions | Keep scripts organized |
-| Log to stderr | `>&2` for errors |
-| Exit codes | `exit 0` success, `exit 1` failure |
+This loop runs forever, following the Nginx access log. Without this loop, the script would finish and the container would exit.
 
 ---
 
-# PART 5: DESIGN PATTERNS AND DESIGN SOLUTIONS IN DEPTH
+## Best Practices
 
-Design patterns are **reusable solutions to recurring problems**. They're not rules — they're tools. A senior engineer knows **when** to use a pattern, and more importantly, **when not to**.
+The first best practice is to use `set -u` to fail on undefined variables. This catches typos and missing environment variables early.
 
----
+```bash
+set -u
+```
 
-## 5.1 Why Design Patterns Matter
+The second best practice is to quote variables. `"$VAR"` handles spaces and special characters correctly. `$VAR` doesn't.
 
-### The Problem
+The third best practice is to use functions for organization. A script with twenty functions is easier to read than a script with two hundred sequential commands.
 
-Every codebase faces the same problems:
+The fourth best practice is to log errors to stderr. Normal output goes to stdout, errors go to stderr. This separation makes it possible to capture errors separately.
 
-- How do I create objects without hardcoding their types?
-- How do I make two incompatible systems work together?
-- How do I notify many parts of my system when something changes?
-- How do I manage state transitions safely?
-
-### The Solution
-
-Design patterns give you **proven answers** to these problems. Instead of inventing a solution from scratch (and getting it wrong), you apply a pattern that thousands of engineers have validated.
-
-### The Warning
-
-Patterns are **not** mandatory. Overusing patterns is worse than not using them at all.
-
-> "A pattern is a solution to a problem **in a context**." — If you don't have the problem, don't use the pattern.
+The fifth best practice is to use exit codes. `exit 0` means success. `exit 1` means failure. Other exit codes can indicate specific errors. Callers can check the exit code to determine whether the script succeeded.
 
 ---
 
-## 5.2 Creational Patterns
+# PART 5: DESIGN PATTERNS IN DEPTH
 
-### 5.2.1 Factory Method
+Design patterns are reusable solutions to recurring problems. They are not rules. They are not recipes to follow mechanically. They are tools — and like any tool, they are useful in some situations and harmful in others.
 
-**Problem:** You need to create objects, but you don't know at compile time which class to instantiate.
+The senior engineer knows the patterns. But more importantly, they know **when** to use a pattern and **when not to**. Overusing patterns is worse than not using them at all. A pattern applied where it doesn't fit adds complexity without adding value.
 
-**Solution:** A method that takes input and returns the right object.
+The right way to think about patterns is this: first, understand the problem deeply. Second, identify what makes the problem hard. Third, check whether a known pattern addresses that specific difficulty. If it does, apply it. If it doesn't, don't force it.
 
-**Your example:**
+This part goes deep into the patterns that matter most for backend engineering, with real prose and concrete examples.
+
+---
+
+## 5.1 Creational Patterns
+
+Creational patterns solve the problem of **creating objects**. They abstract the instantiation process so the system doesn't depend on concrete classes.
+
+### The Factory Method
+
+The factory method solves a specific problem: you need to create an object, but you don't know at compile time which class to instantiate. The decision depends on runtime information.
+
+Think about your adapter system. When `rfqd` receives a command, it needs to talk to a bank. But which bank? That depends on the `bank_id` in the command. If the `bank_id` is the Fibra ID, you need the OctaX adapter. If it's the Braza CNPJ, you need the Braza adapter. If it's an internal bank, you need the internal adapter.
+
+Without a factory, the code would look like this everywhere:
 
 ```python
-def adapter_for(bank_id, bank) -> Adapter:
+if bank_id == ID_BANK_FIBRA:
+    adapter = OctaxAdapter()
+elif bank_id == ID_BANK_BRAZA:
+    adapter = BrazaAdapter()
+else:
+    adapter = InternalAdapter()
+```
+
+This conditional would be repeated in every handler. Adding a new bank would mean finding every conditional and adding a new branch. That's exactly the problem you had in your legacy code.
+
+The factory method solves this by centralizing the decision:
+
+```python
+def adapter_for(bank_id, bank):
     return ADAPTERS[resolve_adapter(bank_id, bank)]
 ```
 
-You pass a `bank_id`, and the factory returns the correct adapter — `OctaxAdapter`, `BrazaAdapter`, or `InternalAdapter`.
+Now the decision is made in one place. Handlers call `adapter_for()` and get the right adapter without knowing which one they got. Adding a new bank means adding one entry to the `ADAPTERS` registry — no changes to the handlers.
 
-**Why it's good:** The caller doesn't know which adapter it gets. It just calls `.quote()` and the right thing happens.
+The factory method is the right pattern when you have multiple implementations of the same interface and need to choose between them at runtime. It centralizes the decision and keeps the rest of the system clean.
+
+The factory method is wrong when you only have one implementation. If there's only one adapter, you don't need a factory — you just instantiate the class directly. The factory adds indirection without adding value.
 
 ---
 
-### 5.2.2 Singleton
+### The Singleton
 
-**Problem:** You need exactly **one instance** of a class, shared across the application.
+The singleton pattern ensures that a class has exactly one instance, shared across the entire application.
 
-**Solution:** A class that only allows one instance to exist.
+The singleton is useful when you have a resource that should only exist once. A database connection pool. A configuration object. A cache.
 
-**Your example:**
+In your system, the `_dedup_store` is a singleton:
 
 ```python
 _dedup_store = ExecutionDedupStore()
@@ -2538,635 +1681,405 @@ def get_execution_result(execution_intent_id):
     return _dedup_store.get_execution_result(execution_intent_id)
 ```
 
-One `_dedup_store`, shared by all callers.
+There's one `ExecutionDedupStore` instance, shared by all callers. This makes sense because the dedup store is a wrapper around Redis, and you don't want multiple connections to Redis when one will do.
 
-**Why it's good:** Avoids creating multiple connections or stores when one is enough.
+The singleton is also useful for configuration. You load the configuration once, at startup, and share it everywhere. Loading it repeatedly would be wasteful and could cause inconsistency if the configuration changes mid-run.
 
-**The caution:** Singletons are global state. They make testing harder and hide dependencies. Use sparingly.
+The danger of the singleton is that it's global state. Global state makes testing harder because tests can't easily isolate themselves from the singleton. It also hides dependencies: a function that uses a singleton doesn't declare that dependency in its signature, so you can't see it from the outside.
 
----
-
-### 5.2.3 Builder
-
-**Problem:** Creating a complex object requires many steps, and the order matters.
-
-**Solution:** A builder that adds pieces step by step, then returns the final object.
-
-**Your example (conceptual):**
-
-```python
-def rfq_register_orderlog(payload, data, client, bank_id, spread, spread_broker):
-    # Step 1: Create RFQ
-    rfq = create_rfq(payload)
-    # Step 2: Add bank
-    rfq.bank_id = bank_id
-    # Step 3: Add spread
-    rfq.rfq_spread = spread
-    # Step 4: Register quote
-    rfq_insert_quote(rfq, bank_id, name)
-    # Step 5: Save
-    orderlog_itemput(rfq)
-    return rfq
-```
-
-The function builds an RFQ piece by piece, then saves it.
+The rule of thumb: use singletons sparingly, and only for things that genuinely should exist once. Don't use them as a way to avoid passing dependencies explicitly.
 
 ---
 
-## 5.3 Structural Patterns
+### The Builder
 
-### 5.3.1 Adapter
+The builder pattern solves the problem of constructing complex objects step by step.
 
-**Problem:** Two systems that should work together have incompatible interfaces.
+Some objects are simple. You create them with a constructor call and you're done. But some objects are complex. They have many fields, some optional, some with defaults, some that depend on other fields. Constructing them in a single call is unwieldy.
 
-**Solution:** A class that translates one interface to the other.
+The builder pattern breaks construction into steps. You create a builder, call methods to set each field, and then call a final method to get the constructed object.
 
-**Your example:**
+The builder is useful when an object has many optional parameters. Instead of a constructor with twenty parameters — most of them `None` — you use a builder that sets only the parameters you need.
 
-```python
-class BrazaAdapter(Adapter):
-    async def quote(self, ctx):
-        result = await libbraza.quote(ctx.rfq_id)
-        return QuoteResult(
-            updated=True,
-            bank_price=result.price,
-            quote_label="Braza",
-        )
-```
+The builder is also useful when construction requires validation or transformation. Each step can validate its input and fail early if something is wrong.
 
-The `BrazaAdapter` translates between `rfqd`'s interface (`ctx` → `QuoteResult`) and `libbraza`'s interface.
+In your system, `rfq_register_orderlog` is a kind of builder. It takes a payload, creates an RFQ piece by piece — setting the bank ID, the spread, the quote — and finally saves the complete object. The construction happens step by step, with validation at each step.
 
-**Why it's good:** The rest of `rfqd` doesn't need to know how Braza works. It just calls `.quote()` and gets a normalized result.
+The builder is wrong when the object is simple. A constructor is clearer and more direct. The builder adds ceremony without adding value.
 
 ---
 
-### 5.3.2 Facade
+## 5.2 Structural Patterns
 
-**Problem:** A complex system has many pieces, and callers need a simple interface.
+Structural patterns solve the problem of **organizing objects** into larger structures. They define how objects relate to each other.
 
-**Solution:** A single class that provides a simplified interface to the whole subsystem.
+### The Adapter
 
-**Your example:**
+The adapter pattern is one of the most useful patterns in backend engineering. It solves a specific problem: two systems that should work together have incompatible interfaces.
 
-```python
-# rfq_api2.py is a facade
-@router.post("/new")
-async def rfq_new(...):
-    data = await _call("new", {...})
-    return JSONResponse(content=data)
-```
+The adapter sits between the two systems and translates one interface to the other. The rest of the system sees the adapter's interface, not the underlying system's interface.
 
-The frontend calls `/new`. It doesn't know about Redis, `rfqd`, adapters, or libraries. The API is a facade hiding all that complexity.
+Your entire institution library architecture is built on the adapter pattern. `rfqd` expects a consistent interface: `create`, `quote`, `execute`, `cancel`. Each bank has a different interface: different URLs, different authentication, different payloads, different response formats.
 
----
+The adapters translate. The `BrazaAdapter` takes `rfqd`'s `ctx` object, extracts the information `rfqd` knows, and translates it into the HTTP calls that Braza expects. Then it takes Braza's response and translates it back into the normalized `QuoteResult` that `rfqd` expects.
 
-### 5.3.3 Proxy
+Without the adapter pattern, `rfqd` would need to know about every bank's API. That's the legacy problem: the HTTP layer knew about OctaX's URLs and payloads. The adapter pattern fixes it by isolating that knowledge in one place.
 
-**Problem:** You need to control access to an object — add caching, logging, access control.
+The adapter is the right pattern whenever you have two systems that need to work together but have different interfaces. It's especially valuable when one of the systems is external and you can't change its interface. You can't change Braza's API. You can only adapt to it.
 
-**Solution:** A wrapper that looks like the original but adds behavior.
-
-**Your example:**
-
-```python
-class ExecutionDedupStore:
-    def get_execution_result(self, execution_intent_id):
-        # Check cache first
-        stored = redis.get(key)
-        if stored:
-            return json.loads(stored)
-        return None
-
-    def save_execution_result(self, execution_intent_id, result):
-        # Save to cache
-        redis.setex(key, ttl, json.dumps(result))
-```
-
-This is a proxy to Redis. It adds caching logic on top of raw Redis access.
+The adapter is wrong when both interfaces are under your control and you can simply make them compatible. If you're building both the caller and the callee, it's often better to design them to work together directly than to insert an adapter between them.
 
 ---
 
-## 5.4 Behavioral Patterns
+### The Facade
 
-### 5.4.1 Strategy
+The facade pattern provides a simple interface to a complex subsystem.
 
-**Problem:** You have multiple algorithms for the same task, and you want to switch between them.
+A complex subsystem has many parts. The HTTP layer. The message queue. The workflow engine. The institution libraries. Each part has its own interface and its own complexity.
 
-**Solution:** Define a common interface, and implement each algorithm as a separate class.
+A facade hides all that complexity behind a simple interface. The client calls the facade and gets a result. It doesn't know about the queue, the daemon, the libraries, or anything else.
 
-**Your example:**
+Your `rfq_api2` is a facade. The frontend calls `POST /new` with a payload. It gets back a JSON response. It doesn't know that the request went through Redis to `rfqd`, then to an adapter, then to a bank, then back through the whole chain. All that complexity is hidden behind the simple HTTP endpoint.
 
-```python
-class OctaxAdapter(Adapter):
-    async def quote(self, ctx):
-        # OctaX-specific logic
-        ...
+The facade is the right pattern when you have a complex system and want to provide a simple interface to it. It reduces the cognitive load on clients and makes the system easier to use.
 
-class BrazaAdapter(Adapter):
-    async def quote(self, ctx):
-        # Braza-specific logic
-        ...
-
-class InternalAdapter(Adapter):
-    async def quote(self, ctx):
-        # Internal pricing logic
-        ...
-```
-
-All three implement `.quote()`, but each does it differently. The caller picks the right one via the factory.
+The facade is wrong when the subsystem is already simple. Adding a facade to a simple system just adds indirection without adding value.
 
 ---
 
-### 5.4.2 Observer
+### The Proxy
 
-**Problem:** When something changes, many parts need to know.
+The proxy pattern provides a substitute for an object. The proxy looks like the original but adds behavior — caching, logging, access control, lazy loading.
 
-**Solution:** Objects subscribe to events. When the event happens, all subscribers are notified.
+A proxy is useful when you want to control access to an object without changing the object itself. The client thinks it's talking to the real object, but it's actually talking to the proxy. The proxy intercepts the call, does something extra, and then forwards to the real object.
 
-**Your example:**
+Your `ExecutionDedupStore` is a kind of proxy to Redis. It looks like a simple store — you call `get_execution_result` and `save_execution_result`. But behind the scenes, it's managing Redis connections, serializing and deserializing JSON, and handling failures gracefully.
+
+The proxy pattern is right when you want to add behavior to an object without changing it. It's especially useful for cross-cutting concerns like logging and caching, which apply to many objects.
+
+The proxy is wrong when the added behavior is so simple that the indirection isn't worth it. If the proxy just forwards calls without doing anything, it's dead weight.
+
+---
+
+## 5.3 Behavioral Patterns
+
+Behavioral patterns solve the problem of **how objects interact**. They define how objects communicate and cooperate.
+
+### The Strategy Pattern
+
+The strategy pattern solves the problem of having multiple algorithms for the same task and needing to switch between them.
+
+The idea is simple: define a common interface for the task, then implement each algorithm as a separate class that conforms to the interface. The caller picks the right strategy and calls it through the interface, not knowing which algorithm it's using.
+
+Your adapter system is a perfect example of the strategy pattern. The task is "quote." There are three strategies: the OctaX strategy, the Braza strategy, and the internal strategy. Each is a separate class. Each implements the same interface. The caller picks the right one and calls `.quote()` without knowing which strategy it got.
+
+The strategy pattern is right when you have multiple algorithms for the same task and the choice between them depends on runtime conditions. It's also useful when you want to add new algorithms without changing existing code — just add a new strategy class.
+
+The strategy pattern is wrong when you have only one algorithm. The indirection isn't worth it.
+
+---
+
+### The Observer Pattern
+
+The observer pattern solves the problem of notifying many objects when something changes.
+
+The idea is simple: objects subscribe to events. When the event happens, all subscribers are notified. The object that fires the event doesn't know who's listening. It just says "this happened" and moves on.
+
+Your system uses the observer pattern for events. When an RFQ is dealt, `rfqd` publishes an event:
 
 ```python
-# rfqd publishes an event
 dbevents_publish_quotebot_event("rfq.dealt", rfq_id=..., bank_id=..., rfq_px=...)
-
-# The quotebot is subscribed to "rfq.dealt" and reacts
 ```
 
-The quotebot doesn't need to be called directly. It subscribes to `rfq.dealt` events and reacts when they happen.
+The quotebot is subscribed to `rfq.dealt` events. When the event fires, the quotebot reacts. `rfqd` doesn't know about the quotebot. It just publishes the event and moves on.
+
+The observer pattern is right when you have one-to-many dependencies. One object changes, and many others need to know. It decouples the changer from the changees.
+
+The observer pattern is wrong when the dependency is one-to-one and synchronous. If object A calls object B directly and waits for a response, that's a direct call, not an observer relationship.
 
 ---
 
-### 5.4.3 State Machine
+### The State Machine Pattern
 
-**Problem:** An object can be in different states, and only certain transitions are valid.
+The state machine pattern models an object that can be in different states, with well-defined transitions between them.
 
-**Solution:** Explicitly define the states and allowed transitions.
+The idea is simple: define the states explicitly. Define the allowed transitions. Reject any transition that isn't allowed.
 
-**Your example:**
+Your RFQ is a state machine. The states are NEW, QUOTE, DEAL, CANCELLED, REJECTED. The transitions are:
 
-```text
-NEW → QUOTE → DEAL
-           → CANCELLED
-           → REJECTED
+```
+NEW → QUOTE
+QUOTE → DEAL
+QUOTE → CANCELLED
+QUOTE → REJECTED
 ```
 
-**Rules:**
+DEAL is terminal. CANCELLED is terminal. REJECTED is terminal. Once in a terminal state, the RFQ can't transition further.
 
-- `DEAL` is terminal — can't transition to anything else
-- `CANCELLED` is terminal
-- Only `QUOTE` can transition to `DEAL`
-- Late cancel can't change `DEAL` to `CANCELLED`
+The state machine pattern is right when an object has a well-defined lifecycle with specific allowed transitions. It makes invalid transitions impossible, not just unlikely.
 
-**Implementation:**
+The state machine is wrong when the lifecycle is flexible and transitions are unrestricted. In that case, the formal machinery of a state machine adds complexity without adding safety.
+
+Your `command_cancel` implements the state machine:
 
 ```python
-TERMINAL_STATES = {"CANCELLED", "REJECTED", "DEAL"}
-
 if status in TERMINAL_STATES:
-    return rfq_cancel_etl(rfq)  # no transition
+    return rfq_cancel_etl(rfq)  # no transition — already terminal
 ```
 
-**Why it matters:** State machines make invalid transitions **impossible**, not just unlikely.
+A late cancel that arrives after a DEAL is rejected. The state machine prevents the invalid transition.
 
 ---
 
-### 5.4.4 Command
+### The Command Pattern
 
-**Problem:** You need to encapsulate a request as an object — so you can queue it, log it, or undo it.
+The command pattern encapsulates a request as an object. Instead of calling a function directly, you create a command object and pass it to an executor.
 
-**Solution:** Turn each request into a command object.
+The command pattern is useful when you want to queue, log, retry, or undo operations. The command object can be stored in a queue, written to a log, retried on failure, or reversed for undo.
 
-**Your example:**
+Your entire message bus is built on the command pattern. The API creates a command:
 
 ```python
 COMMANDS = {
-    "health": command_health,
-    "quoteonce": command_quoteonce,
     "new": command_new,
     "quote": command_quote,
     "execute": command_execute,
     "cancel": command_cancel,
-    "blotter_intraday": command_blotter_intraday,
 }
 ```
 
-Each command is a function. The dispatcher looks up the command by name and calls it.
+Each command is a function. The dispatcher looks up the command by name and calls it. The command can be queued in Redis, retried if it fails, and logged for debugging.
 
-**Why it's good:** Commands can be queued, logged, retried, and deduplicated uniformly.
+The command pattern is right when operations need to be queued, logged, retried, or undone. It's especially useful in distributed systems where operations move between components through a queue.
 
----
-
-### 5.4.5 Template Method
-
-**Problem:** An algorithm has the same structure, but some steps differ.
-
-**Solution:** Define the algorithm in a base class, and let subclasses override the varying steps.
-
-**Your example (conceptual):**
-
-```python
-class Adapter:
-    async def execute(self, ctx):
-        # Same for all: validate state
-        self._validate_can_execute(ctx)
-        # Different per bank
-        result = await self._do_execute(ctx)
-        # Same for all: normalize result
-        return self._normalize(result)
-
-    async def _do_execute(self, ctx):
-        raise NotImplementedError  # subclass implements this
-```
-
-The `execute` flow is the same. Only `_do_execute` differs.
+The command pattern is wrong when operations are simple and synchronous. Direct function calls are clearer and simpler.
 
 ---
 
-## 5.5 When to Use Which Pattern
+## 5.4 Anti-Patterns
 
-| Problem | Pattern |
-|---|---|
-| Need to create objects without specifying exact class | Factory |
-| Need one shared instance | Singleton |
-| Need to translate between incompatible interfaces | Adapter |
-| Need to simplify a complex subsystem | Facade |
-| Need to control access to an object | Proxy |
-| Need to switch between algorithms | Strategy |
-| Need to notify many objects of changes | Observer |
-| Need to manage state transitions safely | State Machine |
-| Need to queue or log requests | Command |
-| Need same algorithm with different steps | Template Method |
+Anti-patterns are common solutions that seem good but actually cause problems. They're what happens when patterns are misapplied or when no pattern is applied at all.
 
----
+### The God Class
 
-## 5.6 The Anti-Patterns — What NOT to Do
+The God Class is a class that does everything. It knows about HTTP. It knows about business logic. It knows about banks. It knows about databases. It knows about pricing. Everything.
 
-### God Class
+Your legacy `rfq_api.py` was a God Class. One file contained every responsibility. The result was that any change to any part of the system required touching that file. Adding a bank meant adding conditionals to the God Class. Changing the pricing logic meant risking a bug in the HTTP handler.
 
-**What:** One class does everything.
-
-**Your legacy `rfq_api.py` was a God Class.** HTTP, business logic, bank protocols, pricing, everything.
-
-**Why bad:** Hard to test, hard to change, hard to understand.
-
-**Fix:** Split by responsibility — exactly what `rfq_api2` + `rfqd` + libraries does.
-
----
+The fix for the God Class is decomposition. Split the responsibilities into separate classes, each with one reason to change. That's what your migration did: `rfq_api2` for HTTP, `rfqd` for workflow, libraries for banks.
 
 ### Spaghetti Code
 
-**What:** No structure. Everything connects to everything.
+Spaghetti code is code with no structure. Everything connects to everything. There's no clear flow. You can't understand a piece of code without understanding the whole system.
 
-**Why bad:** Change one thing, break ten others.
+Spaghetti code is the result of no boundaries. When every part of the system can touch every other part, the connections multiply until the system is a tangled mess.
 
-**Fix:** Boundaries — separate files, clear responsibilities.
-
----
+The fix for spaghetti code is boundaries. Define clear interfaces between components. Restrict what each component can touch. Enforce the boundaries with tests.
 
 ### Copy-Paste Programming
 
-**What:** Duplicate code in many places.
+Copy-paste programming is duplicating code in multiple places instead of extracting shared logic.
 
-**Why bad:** Fix a bug in one place, it remains in others.
+The problem with copy-paste is maintenance. If you fix a bug in one copy, the other copies still have the bug. If you improve one copy, the others lag behind. Over time, the copies diverge, and you have a dozen subtly different versions of the same logic.
 
-**Fix:** Extract shared logic into a function or library.
-
----
+The fix for copy-paste is extraction. Find the common logic, extract it into a shared function or library, and replace the copies with calls to the shared code.
 
 ### Over-Engineering
 
-**What:** Adding complexity for problems you don't have.
+Over-engineering is adding complexity for problems you don't have.
 
-**Example:** Building microservices for a 3-person team with 100 users.
+It's building microservices for a team of three. It's adding a message queue for a system that handles ten requests a day. It's defining an interface with twenty methods when you need two.
 
-**Why bad:** Complexity is a cost. You pay it every day.
+Over-engineering is dangerous because complexity is a cost. You pay it every day. Every layer of indirection makes the code harder to understand. Every abstraction makes debugging harder. Every "just in case" feature adds maintenance burden.
 
-**The senior instinct:** Solve the problem you have, not the problem you might have someday.
-
----
-
-## 5.7 The Senior Approach to Design
-
-### Step 1: Understand the Problem
-
-Before writing code, ask:
-
-- What problem am I actually solving?
-- What's the simplest solution?
-- What could go wrong?
-
-### Step 2: Choose the Simplest Solution
-
-Start simple. Add complexity only when proven necessary.
-
-### Step 3: Identify Boundaries
-
-Where does one responsibility end and another begin?
-
-### Step 4: Apply Patterns Where They Fit
-
-Not because the textbook says so, but because the problem demands it.
-
-### Step 5: Write Tests
-
-Prove the solution works. Tests are the safety net that lets you refactor.
-
-### Step 6: Document the Decision
-
-Write down what you did and why. Future you will thank you.
+The fix for over-engineering is discipline. Solve the problem you have, not the problem you might have someday. Add complexity only when it's justified by a real, present need.
 
 ---
 
 # PART 6: WRITING ARCHITECTURE REPORTS AND DESIGN DRAFTS
 
-This is the skill that makes your thinking visible. A senior engineer can **write clearly** about architecture, so others can understand, review, and decide.
+The ability to write clearly about architecture is one of the most valuable skills a senior engineer can have. It's the skill that makes your thinking visible to others. It's how you communicate your ideas, get feedback, and align the team.
+
+You can have the best architectural instincts in the world, but if you can't write them down clearly, they're useless. The team can't review what's in your head. The boss can't approve what he can't understand. The junior engineers can't learn from what isn't documented.
+
+This part teaches how to write architecture reports and design drafts that are clear, honest, and decision-oriented.
 
 ---
 
-## 6.1 What Is an Architecture Report?
+## What Is an Architecture Report?
 
-An architecture report is a document that **explains the current state of a system, the problems, and the recommended direction**.
+An architecture report is a document that explains the current state of a system, the problems with it, and the recommended direction.
 
-### When to Write One
+It's not a design document. A design document proposes something new. An architecture report describes what exists and what should change.
 
-- Before a major change
-- After an audit
-- When the team needs to align
-- When a decision needs approval
+An architecture report is useful in several situations. Before a major change, to align the team on the current state. After an audit, to communicate findings. When a decision needs approval, to provide the context.
 
-### Structure
+The report should be honest. It should say what works and what doesn't. It should acknowledge risks and uncertainties. It should not pretend everything is fine when it isn't.
 
-```markdown
-# Title
+The report should be concise. Long reports don't get read. Get to the point quickly. State the findings clearly. Make the recommendation explicit.
 
-## Executive Summary
-2-3 paragraphs summarizing the key findings and recommendation.
-
-## Current State
-What exists today. What works. What doesn't.
-
-## Problems
-What's wrong with the current state. Why change is needed.
-
-## Proposed Direction
-What the target architecture looks like.
-
-## Trade-offs
-What we gain. What we lose.
-
-## Risks
-What could go wrong.
-
-## Recommendation
-What to do, in priority order.
-```
+The report should be actionable. It shouldn't just describe — it should recommend. What should we do? In what order? What are the trade-offs?
 
 ---
 
-## 6.2 What Is a Design Draft?
+## What Is a Design Draft?
 
-A design draft is a document that **proposes a new architecture or significant change, before implementation**.
+A design draft is a document that proposes a new architecture or a significant change, before implementation begins.
 
-### When to Write One
+It's called a "draft" because it's not final. It's a proposal for discussion. The team reviews it, challenges it, and suggests changes. Only after review and revision does it become the agreed design.
 
-- Before building something new
-- Before migrating from one system to another
-- When the design is complex enough to need team review
+The design draft serves several purposes. It forces the author to think through the design before writing code. It gives the team a concrete artifact to review. It documents the decisions and their rationale for future reference.
 
-### Structure
-
-```markdown
-# Title
-
-## Status
-Proposal for discussion — not yet approved.
-
-## Objective
-What this document is trying to achieve.
-
-## Current State
-What exists today, and why it's problematic.
-
-## Proposed Design
-The target architecture, with diagrams.
-
-## Components and Responsibilities
-What each part does.
-
-## Data Flow
-How data moves through the system.
-
-## State Model
-What states exist, and what transitions are allowed.
-
-## Failure Handling
-What happens when things go wrong.
-
-## Open Decisions
-What still needs to be decided.
-
-## Out of Scope
-What this draft does NOT cover.
-
-## Approval Question
-The single question the team needs to answer.
-```
+A good design draft has a clear structure. It starts with the problem — what's wrong with the current state? It then proposes a solution — what's the target architecture? It identifies the components and their responsibilities. It shows how data flows through the system. It defines the state model. It handles failures. It lists open decisions. It ends with a question for the team.
 
 ---
 
-## 6.3 Your Draft as an Example
+## The Structure of a Good Design Draft
 
-Your `rfqd-design-draft.md` follows this structure almost exactly:
+Let's walk through each section of a design draft, using your `rfqd-design-draft.md` as a reference.
 
-| Section | What It Does |
-|---|---|
-| Resumo | What the proposal is |
-| Problema atual | Why legacy is bad |
-| Objetivo | What we want |
-| Fluxo conceitual | How data flows |
-| Responsabilidades | Who owns what |
-| Comandos | The API contract |
-| Adapters | How institutions are isolated |
-| Estados | The state machine |
-| Concorrência | Parallelism and coordination |
-| Problemas | Risks to avoid |
-| Transporte | Message bus design |
-| Falhas | Failure handling |
-| Decisões abertas | What's undecided |
-| Fora do escopo | What's not included |
-| Critérios de conclusão | How we know it's done |
-| Pergunta de aprovação | The question for the team |
+### Status
 
-**This is a well-structured design draft.** The problem wasn't the document — it was that the implementation added complexity beyond what the document implied.
+The first section should state the status of the document. Is it a proposal for discussion? Has it been approved? Is it deprecated?
 
----
+Your draft starts with:
 
-## 6.4 How to Write Clearly About Architecture
+> **Status:** proposta para discussão e revisão em equipe
 
-### Rule 1: Use Diagrams
+This is clear. The reader knows this is a proposal, not a final decision.
 
-A diagram is worth a thousand words.
+### Objective
 
-```text
-rfq_api2 → Redis → rfqd → libbraza → Braza API
-```
+The objective says what the document is trying to achieve. Why does it exist? What question is it trying to answer?
 
-Even ASCII diagrams help. They show flow and boundaries.
+Your draft says:
 
-### Rule 2: Use Tables for Comparisons
+> **Objetivo deste documento:** discutir a possível estrutura e as responsabilidades de um futuro `rfqd` antes de autorizar desenho detalhado ou implementação.
 
-| Legacy | New |
-|---|---|
-| One file | Separate modules |
-| Direct bank calls | Via libraries |
-| No locking | Per-RFQ lock |
+This is clear. The document exists to discuss the structure and responsibilities of `rfqd` before authorizing detailed design or implementation.
 
-Tables make trade-offs visible.
+### Current State
 
-### Rule 3: Define Terms
+This section describes what exists today and why it's problematic.
 
-Don't assume everyone knows what "adapter" or "canonical state" means. Define them.
+Your draft has a whole chapter on "Problema atual" — the current problem. It explains that the legacy `rfq_api` accumulates too many responsibilities: HTTP, business logic, institution integration, database access, pricing. It explains why this is a problem: adding a bank requires touching the API, which is architecturally wrong.
 
-### Rule 4: State Assumptions Explicitly
+### Proposed Design
 
-> "Assumption: Redis is internal-only and not exposed publicly."
+This section describes the target architecture.
 
-> "Assumption: Braza offers REST polling for quotes."
+Your draft proposes the separation: `rfq_api2` for HTTP, a message bus for transport, `rfqd` for workflow, adapters for institutions, the orderlog for state.
 
-If an assumption is wrong, the design breaks. State it so others can challenge it.
+### Components and Responsibilities
 
-### Rule 5: Separate "Must" from "Could"
+This section defines what each component does and, importantly, what it does not do.
 
-| Word | Meaning |
-|---|---|
-| **Must** | Required — if this isn't true, the design fails |
-| **Should** | Recommended — but can be compromised |
-| **Could** | Optional — nice to have |
+Your draft has a table that maps components to responsibilities and non-responsibilities. It says `rfq_api2` handles HTTP and SSE but does not know bank IDs, URLs, or payloads. It says `rfqd` handles workflow and state but does not know UI details.
 
-Your draft uses "deve" and "poderia" exactly this way.
+### Data Flow
 
-### Rule 6: End with a Decision
+This section shows how data moves through the system.
 
-Every design draft should end with:
+Your draft has diagrams showing the flow from the RFQ App through `rfq_api2` through the bus through `rfqd` through the adapter to the institution, and back.
 
-> "The team needs to answer: do we agree with this direction?"
+### State Model
 
-Without a clear question, the document is just information. With a question, it's a decision tool.
+This section defines the states and transitions.
 
----
+Your draft has a state machine diagram: NEW → QUOTE → DEAL or CANCELLED or REJECTED. It defines the invariants: DEAL is terminal, CANCELLED is terminal, a late cancel cannot change DEAL.
 
-## 6.5 The Architecture Report You Need to Write
+### Failure Handling
 
-Based on your current situation, you need two documents:
+This section describes what happens when things go wrong.
 
-### Document 1: What We Built
+Your draft has a whole chapter on failures: what happens when `rfqd` is down, when the bus is down, when a bank times out, when a command is repeated.
 
-```markdown
-# RFQ Migration: Current State
+### Open Decisions
 
-## What Was Built
-- rfq_api2 (neutral HTTP facade)
-- rfqd (workflow engine)
-- libbraza, liboctax, libinternal (institution libraries)
-- Redis message bus
-- Locking + idempotency
+This section lists what still needs to be decided.
 
-## What Works
-- Internal parity: 9/9 scenarios
-- Concurrency safety: 7/7 tests
-- Manual price: fixed and passing
+Your draft has a section "Decisões abertas" — open decisions. Redis Streams or Pub/Sub? How many workers? How to implement idempotency?
 
-## What's Blocked
-- OctaX sandbox unreachable
-- Braza sandbox quota exceeded
+### Out of Scope
 
-## What's Not Done
-- ACK/redelivery
-- Multiple workers
-- Quote streaming via Pub/Sub
-```
+This section says what the document does not cover.
 
-### Document 2: What We Should Do Next
+Your draft has "Fora do escopo" — out of scope. It does not authorize defining entrypoints, removing the legacy API, choosing a final message bus.
 
-```markdown
-# RFQ Migration: Next Steps
+### Approval Question
 
-## Simplify
-- Reduce layers if possible
-- Confirm structure with André
+This section ends with the single question the team needs to answer.
 
-## Validate
-- Get OctaX sandbox access
-- Get Braza quota reset
-- Run real sandbox tests
+Your draft ends with: "A equipe concorda que `rfq_api2` deve cuidar apenas do contrato HTTP/SSE, enquanto `rfqd` controla o workflow e utiliza adapters para falar com as instituições?"
 
-## Harden
-- Add ACK/redelivery
-- Multiple workers
-- Quote streaming
-
-## Deploy
-- Shadow mode
-- Canary
-- Cutover
-```
+This is the key. The whole document leads to this question. Everything else is context for answering it.
 
 ---
 
-## 6.6 The Most Important Skill: Honesty
+## How to Write Clearly About Architecture
 
-A senior engineer's reports are **honest**.
+The first rule is to use diagrams. A diagram shows relationships that would take paragraphs to explain. It doesn't have to be fancy — ASCII diagrams are fine. The point is to show structure visually.
 
-They say:
+The second rule is to use tables for comparisons. A table shows trade-offs that would be buried in prose. "Legacy does X, new does Y" is clearer as a table than as two paragraphs.
 
-- "This works."
-- "This doesn't work."
-- "This might break."
-- "I don't know."
-- "We need help with this."
+The third rule is to define terms. Don't assume everyone knows what "adapter" or "canonical state" means. Define them the first time you use them.
 
-They don't say:
+The fourth rule is to state assumptions explicitly. If your design depends on something being true, say so. "Assumption: Braza offers REST polling for quotes." If the assumption is wrong, the design breaks, and the team needs to know that.
 
-- "This is 100% ready" when it's not
-- "No blockers" when there are blockers
-- "Production ready" when sandbox validation is pending
+The fifth rule is to separate "must" from "should" from "could." Must means required — if this isn't true, the design fails. Should means recommended — can be compromised. Could means optional — nice to have.
 
-**Your reports should be trusted.** If you say "ready," people should believe you.
+The sixth rule is to end with a decision. A design document that doesn't ask for a decision is just information. A design document that asks a clear question is a decision tool.
 
 ---
 
-# FINAL SUMMARY
+## The Most Important Skill: Honesty
 
-## What You Now Have
+The most important quality of a good architecture document is honesty.
 
-This document covers:
+An honest document says "this works" when it works, and "this doesn't work" when it doesn't. It says "I don't know" when the answer is uncertain. It says "we need help with this" when the team is stuck.
 
-1. **Architecture** — styles, boundaries, DDD, patterns, clean/hexagonal, event-driven, microservices vs monoliths, distributed systems, API design, data architecture, messaging, consistency, scalability, availability, caching, security, observability, deployment
+An honest document doesn't say "production ready" when sandbox validation is still pending. It doesn't say "no blockers" when there are blockers. It doesn't say "95% complete" when critical paths are untested.
 
-2. **Backend Engineering** — system design, HTTP, distributed systems, databases, caching, message queues, concurrency, networking, auth, security, Docker, observability
+Your documents should be trusted. If you say "ready," people should believe you. If you say "blocked," people should know there's a real blocker. Trust is earned through honesty, and it's lost through exaggeration.
 
-3. **Migration Patterns** — strangler fig, shadow mode, canary, feature toggle, rollback, parity testing
-
-4. **Database Communication** — schema, indexes, transactions, isolation, locking, views, migrations, backups, replication, partitioning, NoSQL, CAP, performance
-
-5. **Makefiles** — targets, variables, conditionals, your Makefile explained
-
-6. **Shell Scripts** — shebang, variables, loops, functions, redirects, your entrypoint explained
-
-7. **Design Patterns** — creational, structural, behavioral, anti-patterns, when to use what
-
-8. **Writing Architecture Reports** — structure, clarity, honesty, decision-making
-
-## How to Use This Going Forward
-
-- When you face a problem, find the section that matches
-- Re-read it before making a decision
-- Use the vocabulary in meetings
-- Write documents using the structures provided
-- Be honest about what works and what doesn't
-
-**You now have the map. The next step is navigating with it.**
+The senior engineer writes honest documents. Not because honesty is virtuous — though it is — but because honesty is practical. An honest document surfaces problems early, when they're cheap to fix. A dishonest document hides problems until they explode in production.
 
 ---
 
-**End of Document.**
+## What You Need to Write Now
+
+Based on your situation, you need two documents.
+
+The first is a **current state report**. It should say what was built, what works, what doesn't, and what's blocked. It should be honest about the fact that OctaX isn't integrated, Braza has sandbox quota issues, and the architecture added complexity that the team didn't expect.
+
+The second is a **simplification plan**. It should propose a simpler structure — fewer layers, fewer files, closer to what the boss expected. It should ask the boss to confirm the structure he wants.
+
+Neither document should be defensive. Neither should blame anyone. Both should be factual, honest, and focused on the path forward.
+
+---
+
+## The Final Lesson
+
+Throughout this entire document, one theme recurs: the senior engineer thinks in terms of **trade-offs, honesty, and communication**.
+
+Trade-offs: every decision has a cost. The senior engineer names the cost explicitly rather than pretending it doesn't exist.
+
+Honesty: the senior engineer says what works and what doesn't. They don't exaggerate. They don't hide. They tell the truth, even when it's uncomfortable.
+
+Communication: the senior engineer writes things down. They share their thinking. They ask for feedback. They align the team before acting.
+
+These three skills — trade-offs, honesty, communication — matter more than any technical knowledge. You can learn technical skills. You can learn patterns and architectures and technologies. But if you can't think in trade-offs, tell the truth, and communicate clearly, the technical skills won't save you.
+
+And if you can do those three things, the technical skills will follow. Because you'll be the kind of engineer people trust, the kind who says what they mean and does what they say, the kind who surfaces problems early and fixes them before they explode.
+
+That's what it means to be a senior engineer. Not knowing everything. Knowing how to think, how to communicate, and how to tell the truth.
+
+---
+
+# END OF DOCUMENT
+
+This is the complete Roadmap to Senior Software Engineering. Return to it as you grow. The sections that don't make sense today will make sense in a month. The sections that seem obvious today will reveal new depth in a year.
+
+The goal was never to memorize this document. The goal was to give you a map. Now you have one.
+
+Go build something.
