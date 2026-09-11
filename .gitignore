@@ -2,3 +2,4 @@
 .gitmodules
 **/cross-app-test/
 .DS_Store
+.vscode
