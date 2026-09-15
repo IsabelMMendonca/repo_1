@@ -3,3 +3,5 @@
 **/cross-app-test/
 .DS_Store
 .vscode
+.pytest_cache/
+.venv
