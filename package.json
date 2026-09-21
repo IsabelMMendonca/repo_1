@@ -14,7 +14,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "cucumber-js"
   },
   "repository": {
     "type": "git",
@@ -27,5 +27,8 @@
   "bugs": {
     "url": "https://github.com/IsabelMMendonca/repo_1/issues"
   },
-  "homepage": "https://github.com/IsabelMMendonca/repo_1#readme"
+  "homepage": "https://github.com/IsabelMMendonca/repo_1#readme",
+  "devDependencies": {
+    "@cucumber/cucumber": "^13.2.1"
+  }
 }

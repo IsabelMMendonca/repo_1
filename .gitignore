@@ -6,3 +6,5 @@
 .pytest_cache/
 .venv
 pytest_cache
+__pycache__/
+file*.txt

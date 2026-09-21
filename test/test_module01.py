@@ -4,14 +4,26 @@
 
 # def test_a2():
 #     pass
+from first import contains_letter
 
-def test_a3():
-    hello="hello"
-    assert "e" in hello
+def test_contains_letter():
+    assert contains_letter("papaya", "a")
 
-class TestMyTests:
-    def test_type(self):
-        assert type(1) == int
+def test_contains_wrong_letter():
+    assert not contains_letter("papaya", "e")
+
+def test_calculate_orders(items, customer_type, coupon=None):
+    items=[
+        {"price": 3.1, "quantity": 100},
+        {"price": 5.99, "quantity": 30},
+        {"price": 10.50, "quantity": 45},
+    ]
+
+    result = calculate_orders(items, customer_type = "regular")
+
+# class TestMyTests:
+#     def test_type(self):
+#         assert type(1) == int
 
     # def test_first_test(self):
     #     assert 1 == 0
