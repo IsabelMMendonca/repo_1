@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QTX Advisory</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; background-color: #0A1628; color: #fff; }
+        
+        /* Header */
+        header { display: flex; justify-content: space-between; align-items: center; padding: 24px 48px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo-container { display: flex; align-items: center; gap: 12px; }
+        .logo-qtx { font-size: 24px; font-weight: 800; color: #00D4FF; letter-spacing: -1px; }
+        .logo-qtx span { color: #fff; font-weight: 300; }
+        .badge-quartix { font-size: 12px; color: #8892A0; border-left: 1px solid #8892A0; padding-left: 12px; }
+        
+        /* Hero */
+        .hero { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; min-height: 80vh; padding: 80px 24px; position: relative; overflow: hidden; }
+        .hero::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(rgba(0, 212, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 212, 255, 0.05) 1px, transparent 1px); background-size: 40px 40px; z-index: 0; }
+        
+        .hero-content { position: relative; z-index: 1; max-width: 800px; }
+        .hero-badge { display: inline-block; background: rgba(0, 212, 255, 0.1); color: #00D4FF; padding: 6px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; margin-bottom: 24px; border: 1px solid rgba(0, 212, 255, 0.2); }
+        .hero h1 { font-size: 56px; font-weight: 800; line-height: 1.1; margin-bottom: 24px; letter-spacing: -2px; }
+        .hero h1 span { color: #00D4FF; }
+        .hero p { font-size: 20px; color: #A0AEC0; line-height: 1.6; margin-bottom: 40px; font-weight: 300; }
+        
+        .cta-group { display: flex; gap: 16px; justify-content: center; }
+        .btn-primary { background: #00D4FF; color: #0A1628; padding: 16px 32px; border-radius: 8px; font-weight: 700; text-decoration: none; transition: all 0.3s; }
+        .btn-primary:hover { background: #00B8E6; transform: translateY(-2px); }
+        .btn-secondary { background: transparent; color: #fff; padding: 16px 32px; border-radius: 8px; font-weight: 600; text-decoration: none; border: 1px solid rgba(255,255,255,0.2); transition: all 0.3s; }
+        .btn-secondary:hover { border-color: #00D4FF; color: #00D4FF; }
+        
+        .hero-footer { margin-top: 60px; display: flex; align-items: center; gap: 12px; color: #8892A0; font-size: 14px; }
+        .hero-footer img { height: 20px; opacity: 0.6; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <div class="logo-qtx">QTX <span>Advisory</span></div>
+            <div class="badge-quartix">by Quartix</div>
+        </div>
+        <div>
+            <a href="#" class="btn-secondary" style="padding: 10px 20px; font-size: 14px;">Falar com especialista</a>
+        </div>
+    </header>
+
+    <section class="hero">
+        <div class="hero-content">
+            <div class="hero-badge">Uma iniciativa Quartix</div>
+            <h1>Decisões cambiais com <span>inteligência institucional</span>.</h1>
+            <p>Advisory em câmbio, derivativos e estratégia financeira internacional. Ajudamos empresas a tomar melhores decisões em operações internacionais.</p>
+            <div class="cta-group">
+                <a href="#" class="btn-primary">Agendar Diagnóstico</a>
+                <a href="https://quartix.io/" target="_blank" class="btn-secondary">Conhecer a Plataforma →</a>
+            </div>
+            <div class="hero-footer">
+                <span>Potencializado por</span>
+                <strong style="color: #fff;">QUARTIX Markets®</strong>
+            </div>
+        </div>
+    </section>
+
+</body>
+</html>
