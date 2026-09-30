@@ -1,7 +1,12 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Input } from "./Input";
 export const NewProject = () => {
   const buttonClass = "text-stone-800 hover:text-stone-950";
+  const project = useRef({
+    title: undefined,
+    desc: undefined,
+    date: undefined
+  })
   return (
     <div className="w-[35rem] mt-16">
       <menu className="flex items-center justify-end gap-4 my-4">
@@ -15,9 +20,9 @@ export const NewProject = () => {
         </li>
       </menu>
       <div>
-        <Input label="title"></Input>
-        <Input label="description" textarea></Input>
-        <Input label="due date"></Input>
+        <Input ref={project.title} label="title"></Input>
+        <Input ref={project.desc} label="description" textarea></Input>
+        <Input ref={project.date} label="due date"></Input>
       </div>
     </div>
   );
