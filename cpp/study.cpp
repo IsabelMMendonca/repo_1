@@ -33,14 +33,86 @@ int main()
         cout << "after adding 1k "<< " vector 2d at 0 0 " << vector_2d.at(0).at(0) << " at 0 1 " << vector_2d.at(0).at(1) << " sizing " << vector_2d.size() << endl;
         */
 
-    int num{10};
+    // int num{10};
 
-    if (num > 10){
-        ++num;
-    }
-    else {
-        cout << "not greater than 10" << endl;
-    }
+    // if (num > 10){
+    //     ++num;
+    // }
+    // else {
+    //     cout << "not greater than 10" << endl;
+    // }
 
+    // int score{};
+    // cout << "Enter your score (0-100): ";
+    // cin >> score;
+
+    // char letter_grade{};
+    // if (score >= 0 && score <= 100)
+    // {
+    //     if (score > 90)
+    //     {
+    //         letter_grade = 'A';
+    //     }
+    //     else if (score > 80)
+    //     {
+    //         letter_grade = 'B';
+    //     }
+    //     else if (score > 70)
+    //     {
+    //         letter_grade = 'C';
+    //     }
+    //     else if (score > 60)
+    //     {
+    //         letter_grade = 'D';
+    //     }
+    //     else
+    //     {
+    //         letter_grade = 'F';
+    //     }
+    //     cout << "Your  grade is: " << letter_grade << endl;
+    // }
+    // else
+    // {
+    //     cout << "Invalid score entered. Please enter a score between 0 and 100." << endl;
+    // }
+
+    // switch (score)
+    // {
+    // case 90 ... 100:
+    //     letter_grade = 'A';
+    //     break;
+    // case 80 ... 89:         
+    //     letter_grade = 'B';
+    //     break;
+    // case 70 ... 79:
+    //     letter_grade = 'C';
+    //     break;
+    // case 60 ... 69:
+    //     letter_grade = 'D';
+    //     break;
+    // case 0 ... 59:
+    //     letter_grade = 'F';
+    //     break;
+    // default:
+    //     cout << "Invalid score entered. Please enter a score between 0 and 100." << endl;
+    //     return 1; // Exit with an error code
+    // }
+    // cout << "Your grade is: " << letter_grade << endl;
+    // cout << endl;
+
+    enum Direction{ left,right,up,down};
+    Direction heading{left};
+
+    switch (heading){
+    case left:
+        cout << "Heading left" << endl;
+        break;
+    case right:
+        cout << "Heading right" << endl;
+        break;
+    default:
+        cout << "Not left or right" << endl;
+
+    }
     return 0;
 }
